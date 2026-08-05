@@ -76,6 +76,16 @@ test("subagent discriminated union rejects mixed shapes", () => {
   assert.equal(validateOutbound({ type: OUT.SUBAGENT, project: "/p", id: "x", phase: "bogus" }).ok, false);
 });
 
+test("resume frame round-trips (tool present or null)", () => {
+  assert.ok(validateOutbound(msg.resume("/p", "partial output so far", "bash")).ok);
+  const noTool = msg.resume("/p", "", null);
+  const r = validateOutbound(noTool);
+  assert.ok(r.ok, r.error);
+  assert.equal(r.value.tool, null);
+  // tool must be string|null, not undefined-as-missing
+  assert.equal(validateOutbound({ type: OUT.RESUME, project: "/p", text: "x" }).ok, false);
+});
+
 test("abort inbound round-trips", () => {
   const r = validateInbound(msg.abort("/p"));
   assert.ok(r.ok, r.error);

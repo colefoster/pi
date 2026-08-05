@@ -123,6 +123,16 @@ export function App({ harnessUrl }) {
           case OUT.DELTA:
             patchSession(id, (s) => ({ streaming: s.streaming + (m.text || "") }));
             break;
+          // Attached mid-turn: seed the in-progress turn as if the deltas/step so
+          // far had arrived. busy (shows the spinner + Stop), streaming SET (not
+          // appended) to the whole partial, and the running tool for the status line.
+          case OUT.RESUME:
+            patchSession(id, (s) => ({
+              busy: true,
+              streaming: m.text || "",
+              lastTool: m.tool || s.lastTool,
+            }));
+            break;
           case OUT.STEP:
             patchSession(id, (s) => ({
               steps: s.steps + 1,

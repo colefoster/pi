@@ -11,7 +11,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, extname } from "node:path";
 import { WebSocketServer, WebSocket } from "ws";
-import { PROTOCOL_VERSION, msg } from "@pi/protocol";
+import { PROTOCOL_VERSION, OUT, msg } from "@pi/protocol";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, "public");
@@ -89,9 +89,28 @@ const httpServer = createServer(async (req, res) => {
 const browsers = new Set();
 let upstream = null;
 
+// This bridge holds ONE shared upstream, so the harness only hands it a
+// mid-turn "resume" at its own connect. To catch up a browser that attaches
+// later, we track per-project live turn state here and synthesize a resume for
+// each new browser (mirrors the harness).
+const live = new Map(); // projectId -> { text, tool }
+function trackLive(obj) {
+  switch (obj?.type) {
+    case OUT.TYPING: live.set(obj.project, { text: "", tool: null }); break;
+    case OUT.DELTA: { const s = live.get(obj.project); if (s) s.text += obj.text; break; }
+    case OUT.STEP: { const s = live.get(obj.project); if (s) s.tool = obj.tool; break; }
+    case OUT.TOOL_END: { const s = live.get(obj.project); if (s) s.tool = null; break; }
+    case OUT.RESUME: live.set(obj.project, { text: obj.text, tool: obj.tool }); break;
+    case OUT.DONE:
+    case OUT.ERROR: live.delete(obj.project); break;
+  }
+}
+
+const MAX_BUFFERED = Number(process.env.WEB_WS_MAX_BUFFER || 4 * 1024 * 1024);
 function broadcast(data) {
   for (const ws of browsers) {
     if (ws.readyState !== 1) continue;
+    if (ws.bufferedAmount > MAX_BUFFERED) { try { ws.close(); } catch {} browsers.delete(ws); continue; }
     try { ws.send(data); } catch { browsers.delete(ws); }
   }
 }
@@ -102,7 +121,10 @@ function connectUpstream() {
     // Harness sends its own per-connection "hello"; browsers get one synthesized
     // on connect, so drop the upstream one and forward everything else as-is.
     const s = raw.toString();
-    try { if (JSON.parse(s)?.type === "hello") return; } catch { return; }
+    let obj;
+    try { obj = JSON.parse(s); } catch { return; }
+    if (obj?.type === "hello") return;
+    trackLive(obj);
     broadcast(s);
   });
   upstream.on("close", () => {
@@ -131,6 +153,12 @@ wss.on("connection", async (ws) => {
     if (ws.readyState === 1) ws.send(JSON.stringify(msg.hello(PROTOCOL_VERSION, projects)));
   } catch {
     if (ws.readyState === 1) ws.send(JSON.stringify(msg.hello(PROTOCOL_VERSION, [])));
+  }
+  // Catch this browser up on any turn currently streaming.
+  for (const [project, s] of live) {
+    if ((s.text || s.tool) && ws.readyState === 1) {
+      try { ws.send(JSON.stringify(msg.resume(project, s.text, s.tool))); } catch {}
+    }
   }
 });
 

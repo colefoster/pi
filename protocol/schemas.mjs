@@ -19,6 +19,12 @@ export const OUTBOUND_SCHEMAS = {
     version: z.number().int(),
     projects: z.array(projectRef),
   }),
+  [OUT.RESUME]: z.object({
+    type: z.literal(OUT.RESUME),
+    project,
+    text: z.string(),
+    tool: z.string().nullable(),
+  }),
   [OUT.TYPING]: z.object({ type: z.literal(OUT.TYPING), project }),
   [OUT.DELTA]: z.object({ type: z.literal(OUT.DELTA), project, text: z.string() }),
   [OUT.STEP]: z.object({

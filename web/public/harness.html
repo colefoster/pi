@@ -1320,6 +1320,14 @@
     if (m.text) pushEvent(OUT.DELTA, m.project, esc(m.text));
     if (st) st.lastAt = Date.now();
   });
+  // Attached mid-turn: the lead already has a turn in flight. Mark it busy and
+  // note the resumed partial + running tool in the activity feed (monitor view).
+  onFrame(OUT.RESUME, (m, st) => {
+    if (st) { st.busy = true; st.lastAt = Date.now(); }
+    const tool = m.tool ? ` · running <code>${esc(m.tool)}</code>` : "";
+    const partial = m.text ? ` · ${esc(String(m.text).slice(-80))}` : "";
+    pushEvent(OUT.RESUME, m.project, `resumed in-flight turn${tool}${partial}`);
+  });
   onFrame(OUT.DONE, (m, st) => {
     if (st) { st.busy = false; st.lastAt = Date.now(); }
     pushEvent(OUT.DONE, m.project, `done · ${st ? st.steps : 0} steps · ${st ? st.agents : 0} agents · ${fmtTok(st ? st.tokens : 0)} tok`);

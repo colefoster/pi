@@ -1217,6 +1217,24 @@
     st.leadBubble.textContent += m.text;
     st.logEl.scrollTop = st.logEl.scrollHeight;
   });
+  // Attached mid-turn: seed the in-progress turn as if the deltas/step so far had
+  // already arrived. Busy + status line (like `typing`), the streaming bubble SET
+  // (not appended) to the whole partial, and the running tool (like `step`).
+  onFrame(OUT.RESUME, (m, st) => {
+    st.busy = true;
+    if (!st.statusEl) startStatus(st);
+    if (!st.leadBubble) st.leadBubble = bubble(st, "msg lead", "");
+    st.leadBubble.textContent = m.text || "";
+    st.logEl.scrollTop = st.logEl.scrollHeight;
+    if (m.tool) {
+      const agent = isAgentTool(m.tool);
+      if (agent) st.agents++; else st.steps++;
+      st.toolLog.push({ tool: m.tool, at: Date.now(), agent, id: null, ok: null });
+      renderStatus(st);
+    }
+    if (m.project === active) syncComposer();
+    renderSidebar();
+  });
   onFrame(OUT.DONE, (m, st) => {
     finishStatus(st); st.leadBubble = null; st.busy = false;
     if (m.project === active) syncComposer();

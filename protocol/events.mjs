@@ -28,6 +28,9 @@ export const IN = Object.freeze({
 
 export const msg = {
   hello: (version, projects) => ({ type: OUT.HELLO, version, projects }),
+  // Late-joiner catch-up for a turn already in flight: accumulated partial text
+  // plus the currently-running tool (or null).
+  resume: (project, text, tool) => ({ type: OUT.RESUME, project, text, tool }),
   typing: (project) => ({ type: OUT.TYPING, project }),
   delta: (project, text) => ({ type: OUT.DELTA, project, text }),
   step: (project, tool, toolCallId, args) => ({ type: OUT.STEP, project, tool, toolCallId, args }),

@@ -6,7 +6,7 @@
 
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
-import { PROTOCOL_VERSION, IN, msg, validateInbound } from "@pi/protocol";
+import { PROTOCOL_VERSION, OUT, IN, msg, validateInbound } from "@pi/protocol";
 import { createHarness } from "./harness.mjs";
 
 const PORT = Number(process.env.HARNESS_PORT || 5179);
@@ -79,10 +79,36 @@ const httpServer = createServer(async (req, res) => {
 
 // ---- websocket: fan harness events out; route user turns in --------------
 const clients = new Set();
+
+// Per-project in-flight turn state, so a client that attaches mid-turn can be
+// caught up on the live tail (backscroll history comes over HTTP /messages).
+const live = new Map(); // projectId -> { text, tool }
+function trackLive(obj) {
+  switch (obj.type) {
+    case OUT.TYPING: live.set(obj.project, { text: "", tool: null }); break;
+    case OUT.DELTA: { const s = live.get(obj.project); if (s) s.text += obj.text; break; }
+    case OUT.STEP: { const s = live.get(obj.project); if (s) s.tool = obj.tool; break; }
+    case OUT.TOOL_END: { const s = live.get(obj.project); if (s) s.tool = null; break; }
+    case OUT.DONE:
+    case OUT.ERROR: live.delete(obj.project); break;
+  }
+}
+
+// Evict a client whose outbound buffer blows past this rather than letting it
+// grow without bound (a stalled tab shouldn't balloon harness memory). It
+// resyncs on reconnect.
+const MAX_BUFFERED = Number(process.env.HARNESS_WS_MAX_BUFFER || 4 * 1024 * 1024);
+
 harness.events.on("event", (obj) => {
+  trackLive(obj);
   const s = JSON.stringify(obj);
   for (const ws of clients) {
     if (ws.readyState !== 1) continue;
+    if (ws.bufferedAmount > MAX_BUFFERED) {
+      try { ws.close(); } catch {}
+      clients.delete(ws);
+      continue;
+    }
     // One flaky client must never abort delivery to the rest, nor escape as
     // an unhandled rejection back through emit().
     try { ws.send(s); } catch { clients.delete(ws); }
@@ -96,6 +122,12 @@ wss.on("connection", (ws) => {
   // is fatal to the whole process (Node throws on unhandled 'error').
   ws.on("error", () => { clients.delete(ws); });
   ws.send(JSON.stringify(msg.hello(PROTOCOL_VERSION, harness.listProjects())));
+  // Catch a late joiner up on any turn currently streaming.
+  for (const [project, s] of live) {
+    if (s.text || s.tool) {
+      try { ws.send(JSON.stringify(msg.resume(project, s.text, s.tool))); } catch {}
+    }
+  }
   ws.on("close", () => clients.delete(ws));
   ws.on("message", (raw) => {
     let frame;
