@@ -13,7 +13,16 @@ const PORT = Number(process.env.HARNESS_PORT || 5179);
 // Loopback-only by default (the web app connects via localhost). Set
 // HARNESS_HOST=0.0.0.0 only if running the harness on a separate box.
 const HOST = process.env.HARNESS_HOST || "127.0.0.1";
-const harness = await createHarness();
+
+let harness;
+try {
+  harness = await createHarness();
+} catch (e) {
+  // The core throws on unrecoverable startup failure (e.g. bad model config);
+  // the service is where we decide that's fatal to the process.
+  console.error(`[harness] failed to start: ${e?.message ?? e}`);
+  process.exit(1);
+}
 
 function json(res, code, obj) {
   res.writeHead(code, { "content-type": "application/json" });

@@ -9,6 +9,7 @@ import { dirname, join, basename, resolve } from "node:path";
 import { homedir } from "node:os";
 import { EventEmitter } from "node:events";
 import { msg, validateOutbound } from "@pi/protocol";
+import { createLeadCache } from "./leadCache.mjs";
 import {
   createAgentSession,
   ModelRuntime,
@@ -146,9 +147,12 @@ export async function createHarness() {
     model = modelRuntime.getModel(settings.provider, settings.model);
     if (!model) throw new Error("model not found for provider");
   } catch (e) {
-    console.error(`[harness] getModel(${settings.provider}, ${settings.model}) failed: ${e?.message ?? e}`);
-    console.error("[harness] Set PI_MODEL to one of the available ids above, then restart.");
-    process.exit(1);
+    // Stay a pure core: surface the failure to the caller (the service decides
+    // whether to exit the process) instead of killing it from inside.
+    throw new Error(
+      `getModel(${settings.provider}, ${settings.model}) failed: ${e?.message ?? e}. ` +
+      `Set PI_MODEL to one of the available ids, then restart.`,
+    );
   }
 
   // List currently-authenticated models for the settings UI (id/name/provider).
@@ -195,7 +199,9 @@ export async function createHarness() {
     settings.thinking = thinking;
     settings.subagent = sub;
     saveSettings(settings);
-    leadPromises.clear();
+    // Dispose the old leads (tears down their subscriptions + sessions) before
+    // dropping them, so each respawns lazily with the new model/thinking.
+    leads.disposeAll();
     console.log(
       `[harness] settings updated → ${provider}/${modelId} · thinking: ${thinking} · ` +
       `sub-agent ${sub.enabled ? sub.model + "/" + sub.thinking : "off"} (leads will respawn)`,
@@ -204,7 +210,7 @@ export async function createHarness() {
   }
 
   // ---- leads: one lazily-created pi session per project -----------------
-  const leadPromises = new Map(); // id -> Promise<{ session, busy }>
+  const leads = createLeadCache({ dispose: disposeLead });
 
   // Live tool manifest for the inspector. Tools are identical across leads, so
   // we capture the resolved definitions (name/description/JSON-schema/source)
@@ -250,12 +256,18 @@ export async function createHarness() {
       model: subModel,
       modelRuntime,
       resourceLoader: loader,
-      sessionManager: SessionManager.create(project.dir),
+      // Ephemeral: a delegated dig is one-shot with no follow-ups, so it must
+      // not persist a throwaway session file to the project's session dir.
+      sessionManager: SessionManager.inMemory(project.dir),
       tools: SUBAGENT_TOOLS,
       thinkingLevel: settings.subagent.thinking,
     });
-    await session.prompt(task);
-    return session.getLastAssistantText() || "(sub-agent returned nothing)";
+    try {
+      await session.prompt(task);
+      return session.getLastAssistantText() || "(sub-agent returned nothing)";
+    } finally {
+      session.dispose?.();
+    }
   }
 
   // A "subagent" tool bound to one project. The lead calls it to delegate a dig;
@@ -329,20 +341,35 @@ export async function createHarness() {
       model,
       modelRuntime,
       resourceLoader: loader,
-      sessionManager: SessionManager.create(project.dir),
+      // Resume the project's most recent on-disk session (creates a new one only
+      // if none exists), so a harness restart or settings-change respawn keeps
+      // conversation memory instead of silently wiping it.
+      sessionManager: SessionManager.continueRecent(project.dir),
       tools: subEnabled ? [...TOOLS, "subagent"] : [...TOOLS],
       customTools: subEnabled ? [makeSubagentTool(project)] : [],
       thinkingLevel: settings.thinking,
     });
-    const lead = { session, busy: false };
     captureManifest(session);
-    session.subscribe((event) => routeEvent(project.id, event));
+    // Capture the unsubscribe handle so disposeLead() can tear the listener down
+    // when this lead is replaced (settings change) — otherwise subscriptions and
+    // sessions leak with every respawn.
+    const unsubscribe = session.subscribe((event) => routeEvent(project.id, event));
+    const lead = { session, busy: false, unsubscribe };
     console.log(`[harness] spun up lead for ${project.name} (${project.dir})`);
     return lead;
   }
+  function disposeLead(leadOrPromise) {
+    Promise.resolve(leadOrPromise)
+      .then((lead) => {
+        try { lead?.unsubscribe?.(); } catch {}
+        try { lead?.session?.dispose?.(); } catch {}
+      })
+      .catch(() => {}); // a lead that never resolved has nothing to dispose
+  }
   function getLead(project) {
-    if (!leadPromises.has(project.id)) leadPromises.set(project.id, createLead(project));
-    return leadPromises.get(project.id);
+    // The cache creates lazily and evicts a failed creation so one transient
+    // failure never permanently bricks the project.
+    return leads.getOrCreate(project.id, () => createLead(project));
   }
 
   // Run one user turn against a project's lead. Emits typing/done/error (and,
@@ -380,10 +407,12 @@ export async function createHarness() {
   // lead hasn't been spawned yet (no session, nothing to replay).
   async function getMessages(projectId) {
     const project = loadProjects().find((p) => p.id === projectId);
-    if (!project || !leadPromises.has(project.id)) return [];
+    if (!project) return [];
+    // Resume the lead (continueRecent under the hood) so backscroll is real even
+    // right after a restart, before any new prompt. Cached, so this spawns once.
     let session;
     try {
-      ({ session } = await leadPromises.get(project.id));
+      ({ session } = await getLead(project));
     } catch {
       return [];
     }
