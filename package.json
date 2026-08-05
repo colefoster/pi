@@ -1,0 +1,25 @@
+{
+  "name": "pi-lead",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "IM-style 'lead' dev agent harness — terse chat over a pi agent, streamed over HTTP/WS to the pi-web UI",
+  "scripts": {
+    "dev": "node harness/service.mjs",
+    "harness": "node harness/service.mjs"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.81.1",
+    "@earendil-works/pi-coding-agent": "0.81.1",
+    "ws": "^8.21.1"
+  },
+  "pnpm": {
+    "ignoredBuiltDependencies": [
+      "@google/genai",
+      "protobufjs"
+    ]
+  }
+}

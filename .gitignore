@@ -1,0 +1,9 @@
+node_modules/
+# harness runtime state (not source)
+projects.json
+settings.json
+# logs / os
+*.log
+.DS_Store
+# playwright/mcp litter
+.playwright-mcp/
