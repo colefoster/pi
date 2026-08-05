@@ -11,18 +11,44 @@ export const projectRef = z.object({
   dir: z.string(),
 });
 
-// ---- Phase 1 vocabulary (hello + delta + user). Extended in later phases. --
+const project = z.string();
+
 export const OUTBOUND_SCHEMAS = {
   [OUT.HELLO]: z.object({
     type: z.literal(OUT.HELLO),
     version: z.number().int(),
     projects: z.array(projectRef),
   }),
-  [OUT.DELTA]: z.object({
-    type: z.literal(OUT.DELTA),
-    project: z.string(),
-    text: z.string(),
+  [OUT.TYPING]: z.object({ type: z.literal(OUT.TYPING), project }),
+  [OUT.DELTA]: z.object({ type: z.literal(OUT.DELTA), project, text: z.string() }),
+  [OUT.STEP]: z.object({ type: z.literal(OUT.STEP), project, tool: z.string() }),
+  [OUT.USAGE]: z.object({
+    type: z.literal(OUT.USAGE),
+    project,
+    input: z.number().int(),
+    output: z.number().int(),
   }),
+  // subagent is polymorphic on `phase`.
+  [OUT.SUBAGENT]: z.discriminatedUnion("phase", [
+    z.object({
+      type: z.literal(OUT.SUBAGENT),
+      project,
+      id: z.string(),
+      phase: z.literal("start"),
+      task: z.string(),
+      model: z.string().optional(),
+    }),
+    z.object({
+      type: z.literal(OUT.SUBAGENT),
+      project,
+      id: z.string(),
+      phase: z.literal("end"),
+      ok: z.boolean(),
+      result: z.string(),
+    }),
+  ]),
+  [OUT.DONE]: z.object({ type: z.literal(OUT.DONE), project }),
+  [OUT.ERROR]: z.object({ type: z.literal(OUT.ERROR), project, text: z.string() }),
 };
 
 export const INBOUND_SCHEMAS = {
@@ -31,6 +57,7 @@ export const INBOUND_SCHEMAS = {
     project: z.string().min(1),
     text: z.string().min(1),
   }),
+  [IN.ABORT]: z.object({ type: z.literal(IN.ABORT), project: z.string().min(1) }),
 };
 
 function pick(schemas, frame) {

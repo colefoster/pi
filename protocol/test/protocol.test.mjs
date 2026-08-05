@@ -37,6 +37,35 @@ test("user inbound builder + schema round-trip", () => {
   assert.ok(r.ok, r.error);
 });
 
+test("full outbound vocabulary round-trips through builders + schemas", () => {
+  const frames = [
+    msg.typing("/p"),
+    msg.step("/p", "bash"),
+    msg.usage("/p", 10, 20),
+    msg.subagentStart("/p", "call-1", "dig into X", "gpt-5.6-sol"),
+    msg.subagentEnd("/p", "call-1", true, "findings"),
+    msg.subagentEnd("/p", "call-1", false, "boom"),
+    msg.done("/p"),
+    msg.error("/p", "nope"),
+  ];
+  for (const f of frames) {
+    const r = validateOutbound(f);
+    assert.ok(r.ok, `${f.type}/${f.phase ?? ""}: ${r.error}`);
+  }
+});
+
+test("subagent discriminated union rejects mixed shapes", () => {
+  // phase:start must not carry end-only fields as its whole shape
+  assert.equal(validateOutbound({ type: OUT.SUBAGENT, project: "/p", id: "x", phase: "start" }).ok, false); // missing task
+  assert.equal(validateOutbound({ type: OUT.SUBAGENT, project: "/p", id: "x", phase: "end", ok: true }).ok, false); // missing result
+  assert.equal(validateOutbound({ type: OUT.SUBAGENT, project: "/p", id: "x", phase: "bogus" }).ok, false);
+});
+
+test("abort inbound round-trips", () => {
+  const r = validateInbound(msg.abort("/p"));
+  assert.ok(r.ok, r.error);
+});
+
 test("malformed frames are rejected", () => {
   assert.equal(validateOutbound({ type: OUT.HELLO }).ok, false); // missing version/projects
   assert.equal(validateOutbound({ type: OUT.DELTA, project: "/p" }).ok, false); // missing text

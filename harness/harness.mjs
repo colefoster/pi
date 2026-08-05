@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, basename, resolve } from "node:path";
 import { homedir } from "node:os";
 import { EventEmitter } from "node:events";
-import { msg } from "@pi/protocol";
+import { msg, validateOutbound } from "@pi/protocol";
 import {
   createAgentSession,
   ModelRuntime,
@@ -118,7 +118,16 @@ function saveSettings(s) {
 // resolves the configured model before returning a usable instance.
 export async function createHarness() {
   const events = new EventEmitter();
-  const emit = (obj) => events.emit("event", obj);
+  // In dev (PI_VALIDATE=1) assert every outbound frame matches the protocol
+  // schema before it hits the wire, so a drift shows up here, not in a client.
+  const validate = process.env.PI_VALIDATE === "1";
+  const emit = (obj) => {
+    if (validate) {
+      const r = validateOutbound(obj);
+      if (!r.ok) console.warn(`[harness] invalid outbound ${obj?.type}: ${r.error}`);
+    }
+    events.emit("event", obj);
+  };
 
   const settings = loadSettings();
 
@@ -272,15 +281,15 @@ export async function createHarness() {
       async execute(toolCallId, params) {
         const task = String(params?.task || "").trim();
         if (!task) return { content: [{ type: "text", text: "error: empty task" }], details: {} };
-        emit({ type: "subagent", project: project.id, id: toolCallId, phase: "start", task, model: settings.subagent.model });
+        emit(msg.subagentStart(project.id, toolCallId, task, settings.subagent.model));
         try {
           const text = await runSubagent(project, task);
-          emit({ type: "subagent", project: project.id, id: toolCallId, phase: "end", ok: true, result: text });
+          emit(msg.subagentEnd(project.id, toolCallId, true, text));
           return { content: [{ type: "text", text }], details: { model: settings.subagent.model } };
         } catch (e) {
-          const msg = e?.message ?? String(e);
-          emit({ type: "subagent", project: project.id, id: toolCallId, phase: "end", ok: false, result: msg });
-          return { content: [{ type: "text", text: "sub-agent failed: " + msg }], details: {} };
+          const errText = e?.message ?? String(e);
+          emit(msg.subagentEnd(project.id, toolCallId, false, errText));
+          return { content: [{ type: "text", text: "sub-agent failed: " + errText }], details: {} };
         }
       },
     });
@@ -295,12 +304,12 @@ export async function createHarness() {
         break;
       }
       case "tool_execution_start":
-        emit({ type: "step", project: projectId, tool: event.toolName });
+        emit(msg.step(projectId, event.toolName));
         break;
       case "turn_end": {
         const m = event.message;
         if (m?.role === "assistant" && m.usage) {
-          emit({ type: "usage", project: projectId, input: m.usage.input | 0, output: m.usage.output | 0 });
+          emit(msg.usage(projectId, m.usage.input | 0, m.usage.output | 0));
         }
         break;
       }
@@ -341,23 +350,23 @@ export async function createHarness() {
   // surface as an "error" event so the caller can stay a thin forwarder.
   async function prompt(projectId, text) {
     const project = loadProjects().find((p) => p.id === projectId);
-    if (!project) return emit({ type: "error", project: projectId, text: "unknown project" });
+    if (!project) return emit(msg.error(projectId, "unknown project"));
 
     let lead;
     try {
       lead = await getLead(project);
     } catch (e) {
-      return emit({ type: "error", project: project.id, text: "couldn't start lead: " + (e?.message ?? e) });
+      return emit(msg.error(project.id, "couldn't start lead: " + (e?.message ?? e)));
     }
-    if (lead.busy) return emit({ type: "error", project: project.id, text: "still working on the last one…" });
+    if (lead.busy) return emit(msg.error(project.id, "still working on the last one…"));
 
     lead.busy = true;
-    emit({ type: "typing", project: project.id });
+    emit(msg.typing(project.id));
     try {
       await lead.session.prompt(text);
-      emit({ type: "done", project: project.id });
+      emit(msg.done(project.id));
     } catch (e) {
-      emit({ type: "error", project: project.id, text: e?.message ?? String(e) });
+      emit(msg.error(project.id, e?.message ?? String(e)));
     } finally {
       lead.busy = false;
     }

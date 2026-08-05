@@ -28,8 +28,17 @@ export const IN = Object.freeze({
 
 export const msg = {
   hello: (version, projects) => ({ type: OUT.HELLO, version, projects }),
+  typing: (project) => ({ type: OUT.TYPING, project }),
   delta: (project, text) => ({ type: OUT.DELTA, project, text }),
+  step: (project, tool) => ({ type: OUT.STEP, project, tool }),
+  usage: (project, input, output) => ({ type: OUT.USAGE, project, input, output }),
+  subagentStart: (project, id, task, model) => ({ type: OUT.SUBAGENT, project, id, phase: "start", task, model }),
+  subagentEnd: (project, id, ok, result) => ({ type: OUT.SUBAGENT, project, id, phase: "end", ok, result }),
+  done: (project) => ({ type: OUT.DONE, project }),
+  error: (project, text) => ({ type: OUT.ERROR, project, text }),
+  // inbound
   user: (project, text) => ({ type: IN.USER, project, text }),
+  abort: (project) => ({ type: IN.ABORT, project }),
 };
 
 /**

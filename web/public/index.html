@@ -746,7 +746,7 @@
   </aside>
 
 <script type="module">
-  import { createClient, PROTOCOL_VERSION } from "/protocol/browser.mjs";
+  import { createClient, PROTOCOL_VERSION, OUT } from "/protocol/browser.mjs";
 
   const logsWrap = document.getElementById("logs");
   const projList = document.getElementById("projlist");
@@ -1121,68 +1121,73 @@
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && inspectorOpen) closeInspector(); });
 
   // ---- websocket (transport via the shared @pi/protocol client) ----
-  // Existing per-type switch, unchanged — every frame is fed here exactly once.
-  function handleFrame(m) {
-      if (m.type === "hello") { projects = m.projects || []; loadProjects(); return; }
-      if (!m.project) return;
-      const st = stateFor(m.project);
-      switch (m.type) {
-        case "typing":
-          st.busy = true; startStatus(st);
-          if (m.project === active) sendBtn.disabled = true;
-          renderSidebar();
-          break;
-        case "step": {
-          const agent = isAgentTool(m.tool);
-          if (agent) st.agents++; else st.steps++;
-          st.toolLog.push({ tool: m.tool || "?", at: Date.now(), agent });
-          if (st.toolLog.length > 200) st.toolLog.shift();
-          renderStatus(st);
-          break;
-        }
-        case "usage":
-          st.tokens += (m.input || 0) + (m.output || 0);
-          renderStatus(st);
-          break;
-        case "subagent":
-          if (m.phase === "start") {
-            st.subs.push({ id: m.id, task: m.task || "", status: "running", result: "", at: Date.now() });
-            if (st.subs.length > 12) st.subs.shift();
-          } else {
-            const s = st.subs.find((x) => x.id === m.id);
-            if (s) { s.status = m.ok ? "done" : "error"; s.result = m.result || ""; }
-          }
-          break;
-        case "delta":
-          if (!st.leadBubble) st.leadBubble = bubble(st, "msg lead", "");
-          st.leadBubble.textContent += m.text;
-          st.logEl.scrollTop = st.logEl.scrollHeight;
-          break;
-        case "done":
-          finishStatus(st); st.leadBubble = null; st.busy = false;
-          if (m.project === active) sendBtn.disabled = false;
-          renderSidebar();
-          break;
-        case "error":
-          finishStatus(st); st.leadBubble = null; st.busy = false;
-          bubble(st, "msg lead", "⚠️ " + m.text);
-          if (m.project === active) sendBtn.disabled = false;
-          renderSidebar();
-          break;
-      }
-      syncInspector(st);
-  }
-
+  // Typed per-type handlers keyed off OUT.* constants — no event-type literals.
   client = createClient({
     url: `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`,
     WebSocket: window.WebSocket,
     onOpen: () => { socketOpen = true; conn.classList.add("on"); },
     onClose: () => { socketOpen = false; conn.classList.remove("on"); },
-    onVersionMismatch: ({ client, server }) => console.warn(`[pi] protocol mismatch: client v${client} vs harness v${server}`),
+    // Surface a protocol mismatch visibly: flip the connection dot to an error
+    // state (red + hover title) so a stale client is obvious, not just logged.
+    onVersionMismatch: ({ client, server }) => {
+      conn.classList.remove("on");
+      conn.style.background = "var(--color-danger)";
+      conn.style.boxShadow = "0 0 9px var(--color-danger)";
+      conn.title = `harness protocol v${server} — refresh (client v${client})`;
+    },
   });
-  // hello + delta now flow through the shared @pi/protocol client (Phase 1 tracer):
-  // the catch-all delivers every frame to the existing switch exactly once.
-  client.on("*", handleFrame);
+
+  // hello has no `project`; every other frame filters into its project slice and
+  // re-syncs the inspector. One typed handler per OUT.* event type.
+  client.on(OUT.HELLO, (m) => { projects = m.projects || []; loadProjects(); });
+  const onFrame = (type, fn) => client.on(type, (m) => {
+    if (!m.project) return;
+    const st = stateFor(m.project);
+    fn(m, st);
+    syncInspector(st);
+  });
+
+  onFrame(OUT.TYPING, (m, st) => {
+    st.busy = true; startStatus(st);
+    if (m.project === active) sendBtn.disabled = true;
+    renderSidebar();
+  });
+  onFrame(OUT.STEP, (m, st) => {
+    const agent = isAgentTool(m.tool);
+    if (agent) st.agents++; else st.steps++;
+    st.toolLog.push({ tool: m.tool || "?", at: Date.now(), agent });
+    if (st.toolLog.length > 200) st.toolLog.shift();
+    renderStatus(st);
+  });
+  onFrame(OUT.USAGE, (m, st) => {
+    st.tokens += (m.input || 0) + (m.output || 0);
+    renderStatus(st);
+  });
+  onFrame(OUT.SUBAGENT, (m, st) => {
+    if (m.phase === "start") {
+      st.subs.push({ id: m.id, task: m.task || "", status: "running", result: "", at: Date.now() });
+      if (st.subs.length > 12) st.subs.shift();
+    } else {
+      const s = st.subs.find((x) => x.id === m.id);
+      if (s) { s.status = m.ok ? "done" : "error"; s.result = m.result || ""; }
+    }
+  });
+  onFrame(OUT.DELTA, (m, st) => {
+    if (!st.leadBubble) st.leadBubble = bubble(st, "msg lead", "");
+    st.leadBubble.textContent += m.text;
+    st.logEl.scrollTop = st.logEl.scrollHeight;
+  });
+  onFrame(OUT.DONE, (m, st) => {
+    finishStatus(st); st.leadBubble = null; st.busy = false;
+    if (m.project === active) sendBtn.disabled = false;
+    renderSidebar();
+  });
+  onFrame(OUT.ERROR, (m, st) => {
+    finishStatus(st); st.leadBubble = null; st.busy = false;
+    bubble(st, "msg lead", "⚠️ " + m.text);
+    if (m.project === active) sendBtn.disabled = false;
+    renderSidebar();
+  });
 
   function submit() {
     const text = input.value.trim();

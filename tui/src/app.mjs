@@ -10,6 +10,7 @@ import TextInput from "ink-text-input";
 import Spinner from "ink-spinner";
 import htm from "htm";
 import { createClient } from "./harnessClient.mjs";
+import { OUT } from "@pi/protocol";
 
 const html = htm.bind(React.createElement);
 
@@ -102,31 +103,35 @@ export function App({ harnessUrl }) {
 
     conn.current = client.connect({
       onStatus: (s) => alive && setStatus(s),
+      // Surface a protocol mismatch on the app's notice line, not just the console.
+      onVersionMismatch: ({ client: c, server }) =>
+        alive && flash(`harness protocol v${server} — restart the TUI (client v${c})`),
+      // Dispatch keys off OUT.* constants — no bare event-type string literals.
       onEvent: (m) => {
         if (!alive) return;
-        if (m.type === "hello") {
+        if (m.type === OUT.HELLO) {
           if (Array.isArray(m.projects)) setProjects(m.projects);
           return;
         }
         const id = m.project;
         if (!id) return;
         switch (m.type) {
-          case "typing":
+          case OUT.TYPING:
             patchSession(id, () => ({ busy: true, streaming: "", steps: 0, agents: 0, tokensIn: 0, tokensOut: 0, lastTool: "" }));
             break;
-          case "delta":
+          case OUT.DELTA:
             patchSession(id, (s) => ({ streaming: s.streaming + (m.text || "") }));
             break;
-          case "step":
+          case OUT.STEP:
             patchSession(id, (s) => ({ steps: s.steps + 1, lastTool: m.tool || s.lastTool }));
             break;
-          case "subagent":
+          case OUT.SUBAGENT:
             if (m.phase === "start") patchSession(id, (s) => ({ agents: s.agents + 1, lastTool: "subagent" }));
             break;
-          case "usage":
+          case OUT.USAGE:
             patchSession(id, (s) => ({ tokensIn: s.tokensIn + (m.input | 0), tokensOut: s.tokensOut + (m.output | 0) }));
             break;
-          case "done":
+          case OUT.DONE:
             patchSession(id, (s) => ({
               busy: false,
               streaming: "",
@@ -138,7 +143,7 @@ export function App({ harnessUrl }) {
                 : s.messages,
             }));
             break;
-          case "error":
+          case OUT.ERROR:
             patchSession(id, (s) => ({
               busy: false,
               streaming: "",

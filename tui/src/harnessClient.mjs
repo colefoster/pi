@@ -44,16 +44,19 @@ export function createClient(harnessUrl) {
     // The shared @pi/protocol client owns JSON parsing, auto-reconnect, socket-
     // error containment, and the version handshake. We just adapt its lifecycle
     // to this module's existing onEvent/onStatus contract.
-    // handlers: { onEvent(obj), onStatus("connecting"|"open"|"closed") }
-    connect({ onEvent, onStatus } = {}) {
+    // handlers: { onEvent(obj), onStatus(...), onVersionMismatch({client,server}) }
+    connect({ onEvent, onStatus, onVersionMismatch } = {}) {
       onStatus?.("connecting");
       const client = createProtocolClient({
         url: wsUrl,
         WebSocket,
         onOpen: () => onStatus?.("open"),
         onClose: () => onStatus?.("closed"),
-        onVersionMismatch: ({ client, server }) =>
-          console.error(`[pi] protocol mismatch: client v${client} vs harness v${server}`),
+        // Prefer the app's UI channel; fall back to console only if none wired.
+        onVersionMismatch: (info) =>
+          onVersionMismatch
+            ? onVersionMismatch(info)
+            : console.error(`[pi] protocol mismatch: client v${info.client} vs harness v${info.server}`),
       });
       // Every frame drives the existing onEvent callback, unchanged.
       client.on("*", (frame) => onEvent?.(frame));

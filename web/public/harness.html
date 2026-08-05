@@ -855,7 +855,7 @@
   </div>
 
 <script type="module">
-  import { createClient, PROTOCOL_VERSION } from "/protocol/browser.mjs";
+  import { createClient, PROTOCOL_VERSION, OUT } from "/protocol/browser.mjs";
 
   /* ============================================================
      LIVE DATA — loaded from the harness control API (same-origin)
@@ -1256,65 +1256,69 @@
     renderLeadViews(); renderLeadEffect();
   }
 
-  // Transport via the shared @pi/protocol client. Existing per-type switch is
-  // unchanged; every frame is fed to handleFrame exactly once via on("*").
-  function handleFrame(m) {
-      if (m.type === "hello") { syncProjects(m.projects); return; }
-      const st = m.project ? stateFor(m.project) : null;
-      switch (m.type) {
-        case "typing":
-          if (st) { st.busy = true; st.lastAt = Date.now(); }
-          pushEvent("typing", m.project, "lead thinking");
-          break;
-        case "step": {
-          const agent = isAgentTool(m.tool);
-          if (st) { if (agent) st.agents++; else st.steps++; st.lastAt = Date.now(); }
-          pushEvent("step", m.project, `<code>${esc(m.tool || "?")}</code>`);
-          break;
-        }
-        case "usage":
-          if (st) { st.tokens += (m.input || 0) + (m.output || 0); st.lastAt = Date.now(); }
-          pushEvent("usage", m.project, `in ${fmtTok(m.input || 0)} · out ${fmtTok(m.output || 0)}`);
-          break;
-        case "subagent":
-          if (m.phase === "start") {
-            SUB_RUNS.push({ id: m.id, project: m.project, task: m.task || "", status: "running", result: "", model: m.model || SUBCFG.model || CONFIG.model, at: Date.now() });
-            if (SUB_RUNS.length > 40) SUB_RUNS.shift();
-            pushEvent("subagent", m.project, `start · ${esc(m.task || "investigation")}`);
-          } else {
-            const r = SUB_RUNS.find(x => x.id === m.id);
-            if (r) { r.status = m.ok ? "done" : "error"; r.result = m.result || ""; if (m.model) r.model = m.model; }
-            pushEvent("subagent", m.project, `end · ${m.ok ? "ok" : "fail"}${m.result ? " · " + esc(String(m.result).slice(0, 80)) : ""}`);
-          }
-          renderSubRuns();
-          break;
-        case "delta":
-          if (m.text) pushEvent("delta", m.project, esc(m.text));
-          if (st) st.lastAt = Date.now();
-          break;
-        case "done":
-          if (st) { st.busy = false; st.lastAt = Date.now(); }
-          pushEvent("done", m.project, `done · ${st ? st.steps : 0} steps · ${st ? st.agents : 0} agents · ${fmtTok(st ? st.tokens : 0)} tok`);
-          break;
-        case "error":
-          if (st) { st.busy = false; st.lastAt = Date.now(); }
-          pushEvent("error", m.project, esc(m.text || "error"));
-          break;
-        default:
-          return;
-      }
-      renderStatGrid(); renderOvLeads(); renderLeads(); renderLeadEffect(); renderChips();
-  }
-
+  // Transport via the shared @pi/protocol client. Typed per-type handlers keyed
+  // off OUT.* constants replace the old string-literal switch; each still ends
+  // with the same batch of re-renders (the former post-switch tail).
   const client = createClient({
     url: `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`,
     WebSocket: window.WebSocket,
     onOpen: () => setConn(true),
     onClose: () => setConn(false),
-    onVersionMismatch: ({ client, server }) => console.warn(`[pi] protocol mismatch: client v${client} vs harness v${server}`),
+    // Surface a protocol mismatch visibly: flip the conn dot to an error state
+    // and drop an error row into the live feed, not just a console warning.
+    onVersionMismatch: ({ client, server }) => {
+      connDot.classList.remove("on");
+      connDot.style.background = "var(--color-danger)";
+      connDot.style.boxShadow = "0 0 9px var(--color-danger)";
+      connDot.title = `harness protocol v${server} — refresh (client v${client})`;
+      pushEvent(OUT.ERROR, null, `protocol mismatch — harness v${esc(server)}, refresh the page`);
+    },
   });
-  // hello + delta now flow through the shared @pi/protocol client (Phase 1 tracer).
-  client.on("*", handleFrame);
+
+  client.on(OUT.HELLO, (m) => syncProjects(m.projects));
+  const onFrame = (type, fn) => client.on(type, (m) => {
+    const st = m.project ? stateFor(m.project) : null;
+    fn(m, st);
+    renderStatGrid(); renderOvLeads(); renderLeads(); renderLeadEffect(); renderChips();
+  });
+
+  onFrame(OUT.TYPING, (m, st) => {
+    if (st) { st.busy = true; st.lastAt = Date.now(); }
+    pushEvent(OUT.TYPING, m.project, "lead thinking");
+  });
+  onFrame(OUT.STEP, (m, st) => {
+    const agent = isAgentTool(m.tool);
+    if (st) { if (agent) st.agents++; else st.steps++; st.lastAt = Date.now(); }
+    pushEvent(OUT.STEP, m.project, `<code>${esc(m.tool || "?")}</code>`);
+  });
+  onFrame(OUT.USAGE, (m, st) => {
+    if (st) { st.tokens += (m.input || 0) + (m.output || 0); st.lastAt = Date.now(); }
+    pushEvent(OUT.USAGE, m.project, `in ${fmtTok(m.input || 0)} · out ${fmtTok(m.output || 0)}`);
+  });
+  onFrame(OUT.SUBAGENT, (m) => {
+    if (m.phase === "start") {
+      SUB_RUNS.push({ id: m.id, project: m.project, task: m.task || "", status: "running", result: "", model: m.model || SUBCFG.model || CONFIG.model, at: Date.now() });
+      if (SUB_RUNS.length > 40) SUB_RUNS.shift();
+      pushEvent(OUT.SUBAGENT, m.project, `start · ${esc(m.task || "investigation")}`);
+    } else {
+      const r = SUB_RUNS.find(x => x.id === m.id);
+      if (r) { r.status = m.ok ? "done" : "error"; r.result = m.result || ""; if (m.model) r.model = m.model; }
+      pushEvent(OUT.SUBAGENT, m.project, `end · ${m.ok ? "ok" : "fail"}${m.result ? " · " + esc(String(m.result).slice(0, 80)) : ""}`);
+    }
+    renderSubRuns();
+  });
+  onFrame(OUT.DELTA, (m, st) => {
+    if (m.text) pushEvent(OUT.DELTA, m.project, esc(m.text));
+    if (st) st.lastAt = Date.now();
+  });
+  onFrame(OUT.DONE, (m, st) => {
+    if (st) { st.busy = false; st.lastAt = Date.now(); }
+    pushEvent(OUT.DONE, m.project, `done · ${st ? st.steps : 0} steps · ${st ? st.agents : 0} agents · ${fmtTok(st ? st.tokens : 0)} tok`);
+  });
+  onFrame(OUT.ERROR, (m, st) => {
+    if (st) { st.busy = false; st.lastAt = Date.now(); }
+    pushEvent(OUT.ERROR, m.project, esc(m.text || "error"));
+  });
 
   /* ============================================================
      RESPONSIVE — live rail toggle
