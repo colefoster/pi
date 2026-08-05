@@ -746,6 +746,8 @@
   </aside>
 
 <script type="module">
+  import { createClient, PROTOCOL_VERSION } from "/protocol/browser.mjs";
+
   const logsWrap = document.getElementById("logs");
   const projList = document.getElementById("projlist");
   const input = document.getElementById("in");
@@ -755,7 +757,8 @@
   const activeName = document.getElementById("activeName");
   const activeDir = document.getElementById("activeDir");
 
-  let ws;
+  let client;                        // shared @pi/protocol client (owns the socket)
+  let socketOpen = false;
   let projects = [];
   let active = null;                 // active project id
   const P = new Map();               // id -> per-project state
@@ -1117,13 +1120,9 @@
   inspBack.onclick = closeInspector;
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && inspectorOpen) closeInspector(); });
 
-  // ---- websocket ----
-  function connect() {
-    ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`);
-    ws.onopen = () => conn.classList.add("on");
-    ws.onclose = () => { conn.classList.remove("on"); setTimeout(connect, 1000); };
-    ws.onmessage = (e) => {
-      const m = JSON.parse(e.data);
+  // ---- websocket (transport via the shared @pi/protocol client) ----
+  // Existing per-type switch, unchanged — every frame is fed here exactly once.
+  function handleFrame(m) {
       if (m.type === "hello") { projects = m.projects || []; loadProjects(); return; }
       if (!m.project) return;
       const st = stateFor(m.project);
@@ -1172,18 +1171,27 @@
           break;
       }
       syncInspector(st);
-    };
   }
-  connect();
+
+  client = createClient({
+    url: `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`,
+    WebSocket: window.WebSocket,
+    onOpen: () => { socketOpen = true; conn.classList.add("on"); },
+    onClose: () => { socketOpen = false; conn.classList.remove("on"); },
+    onVersionMismatch: ({ client, server }) => console.warn(`[pi] protocol mismatch: client v${client} vs harness v${server}`),
+  });
+  // hello + delta now flow through the shared @pi/protocol client (Phase 1 tracer):
+  // the catch-all delivers every frame to the existing switch exactly once.
+  client.on("*", handleFrame);
 
   function submit() {
     const text = input.value.trim();
-    if (!text || !active || !ws || ws.readyState !== 1) return;
+    if (!text || !active || !socketOpen) return;
     const st = stateFor(active);
     if (st.busy) return;
     bubble(st, "msg me", text);
     st.leadBubble = null;
-    ws.send(JSON.stringify({ type: "user", project: active, text }));
+    client.sendUser(active, text);
     input.value = ""; input.style.height = "auto";
     sendBtn.disabled = true;
   }

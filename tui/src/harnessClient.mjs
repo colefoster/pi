@@ -8,7 +8,8 @@
 //   typing → (delta|step|usage|subagent)* → done | error
 // A lead is single-flight: sending while it's busy yields an `error` event.
 
-import WebSocket from "ws";
+import { createClient as createProtocolClient, PROTOCOL_VERSION } from "@pi/protocol";
+import { WebSocket } from "ws";
 
 export function createClient(harnessUrl) {
   const http = harnessUrl.replace(/\/$/, "");
@@ -39,59 +40,33 @@ export function createClient(harnessUrl) {
     getMessages: (id) => req(`/messages?project=${encodeURIComponent(id)}`),
 
     // ---- WebSocket ----
-    // connect(handlers) → { send(obj), close() }. Auto-reconnects with backoff.
+    // connect(handlers) → { send(obj), sendUser(project,text), close() }.
+    // The shared @pi/protocol client owns JSON parsing, auto-reconnect, socket-
+    // error containment, and the version handshake. We just adapt its lifecycle
+    // to this module's existing onEvent/onStatus contract.
     // handlers: { onEvent(obj), onStatus("connecting"|"open"|"closed") }
     connect({ onEvent, onStatus } = {}) {
-      let ws = null;
-      let closed = false;
-      let backoff = 500;
-      const queue = []; // messages sent while the socket is down
-
-      const open = () => {
-        if (closed) return;
-        onStatus?.("connecting");
-        ws = new WebSocket(wsUrl);
-
-        ws.on("open", () => {
-          backoff = 500;
-          onStatus?.("open");
-          while (queue.length && ws.readyState === WebSocket.OPEN) ws.send(queue.shift());
-        });
-        ws.on("message", (raw) => {
-          let obj;
-          try {
-            obj = JSON.parse(raw.toString());
-          } catch {
-            return;
-          }
-          onEvent?.(obj);
-        });
-        ws.on("close", () => {
-          onStatus?.("closed");
-          if (closed) return;
-          setTimeout(open, backoff);
-          backoff = Math.min(backoff * 2, 8000);
-        });
-        // Swallow errors — the close handler drives reconnection.
-        ws.on("error", () => {});
-      };
-
-      open();
+      onStatus?.("connecting");
+      const client = createProtocolClient({
+        url: wsUrl,
+        WebSocket,
+        onOpen: () => onStatus?.("open"),
+        onClose: () => onStatus?.("closed"),
+        onVersionMismatch: ({ client, server }) =>
+          console.error(`[pi] protocol mismatch: client v${client} vs harness v${server}`),
+      });
+      // Every frame drives the existing onEvent callback, unchanged.
+      client.on("*", (frame) => onEvent?.(frame));
 
       return {
         send(obj) {
-          const s = JSON.stringify(obj);
-          if (ws && ws.readyState === WebSocket.OPEN) ws.send(s);
-          else queue.push(s);
+          client.send(obj);
         },
         sendUser(project, text) {
-          this.send({ type: "user", project, text });
+          client.sendUser(project, text);
         },
         close() {
-          closed = true;
-          try {
-            ws?.close();
-          } catch {}
+          client.close();
         },
       };
     },

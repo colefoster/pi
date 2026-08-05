@@ -6,6 +6,7 @@
 
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
+import { PROTOCOL_VERSION, msg } from "@pi/protocol";
 import { createHarness } from "./harness.mjs";
 
 const PORT = Number(process.env.HARNESS_PORT || 5179);
@@ -85,7 +86,7 @@ wss.on("connection", (ws) => {
   // Without this, a dropped/reset socket emits 'error' with no listener, which
   // is fatal to the whole process (Node throws on unhandled 'error').
   ws.on("error", () => { clients.delete(ws); });
-  ws.send(JSON.stringify({ type: "hello", projects: harness.listProjects() }));
+  ws.send(JSON.stringify(msg.hello(PROTOCOL_VERSION, harness.listProjects())));
   ws.on("close", () => clients.delete(ws));
   ws.on("message", (raw) => {
     let msg;

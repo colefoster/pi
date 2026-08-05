@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, basename, resolve } from "node:path";
 import { homedir } from "node:os";
 import { EventEmitter } from "node:events";
+import { msg } from "@pi/protocol";
 import {
   createAgentSession,
   ModelRuntime,
@@ -290,7 +291,7 @@ export async function createHarness() {
     switch (event.type) {
       case "message_update": {
         const a = event.assistantMessageEvent;
-        if (a?.type === "text_delta" && a.delta) emit({ type: "delta", project: projectId, text: a.delta });
+        if (a?.type === "text_delta" && a.delta) emit(msg.delta(projectId, a.delta));
         break;
       }
       case "tool_execution_start":

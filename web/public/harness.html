@@ -855,6 +855,8 @@
   </div>
 
 <script type="module">
+  import { createClient, PROTOCOL_VERSION } from "/protocol/browser.mjs";
+
   /* ============================================================
      LIVE DATA — loaded from the harness control API (same-origin)
      ============================================================ */
@@ -1254,14 +1256,9 @@
     renderLeadViews(); renderLeadEffect();
   }
 
-  let ws = null;
-  function connect() {
-    ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`);
-    ws.onopen = () => setConn(true);
-    ws.onclose = () => { setConn(false); setTimeout(connect, 1000); };
-    ws.onerror = () => { try { ws.close(); } catch {} };
-    ws.onmessage = (e) => {
-      let m; try { m = JSON.parse(e.data); } catch { return; }
+  // Transport via the shared @pi/protocol client. Existing per-type switch is
+  // unchanged; every frame is fed to handleFrame exactly once via on("*").
+  function handleFrame(m) {
       if (m.type === "hello") { syncProjects(m.projects); return; }
       const st = m.project ? stateFor(m.project) : null;
       switch (m.type) {
@@ -1307,9 +1304,17 @@
           return;
       }
       renderStatGrid(); renderOvLeads(); renderLeads(); renderLeadEffect(); renderChips();
-    };
   }
-  connect();
+
+  const client = createClient({
+    url: `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`,
+    WebSocket: window.WebSocket,
+    onOpen: () => setConn(true),
+    onClose: () => setConn(false),
+    onVersionMismatch: ({ client, server }) => console.warn(`[pi] protocol mismatch: client v${client} vs harness v${server}`),
+  });
+  // hello + delta now flow through the shared @pi/protocol client (Phase 1 tracer).
+  client.on("*", handleFrame);
 
   /* ============================================================
      RESPONSIVE — live rail toggle

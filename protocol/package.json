@@ -1,0 +1,23 @@
+{
+  "name": "@pi/protocol",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Single source of truth for the pi harness wire protocol: versioned event/message vocabulary, zod schemas (node), and a transport-agnostic client.",
+  "exports": {
+    ".": "./index.mjs",
+    "./browser": "./browser.mjs"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "dependencies": {
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "ws": "^8.21.1"
+  }
+}

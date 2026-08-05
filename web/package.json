@@ -11,6 +11,7 @@
     "node": ">=22.19"
   },
   "dependencies": {
+    "@pi/protocol": "workspace:*",
     "ws": "^8.21.1"
   }
 }
