@@ -6,7 +6,7 @@
 
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
-import { PROTOCOL_VERSION, msg } from "@pi/protocol";
+import { PROTOCOL_VERSION, IN, msg, validateInbound } from "@pi/protocol";
 import { createHarness } from "./harness.mjs";
 
 const PORT = Number(process.env.HARNESS_PORT || 5179);
@@ -98,10 +98,12 @@ wss.on("connection", (ws) => {
   ws.send(JSON.stringify(msg.hello(PROTOCOL_VERSION, harness.listProjects())));
   ws.on("close", () => clients.delete(ws));
   ws.on("message", (raw) => {
-    let msg;
-    try { msg = JSON.parse(raw.toString()); } catch { return; }
-    if (msg.type !== "user" || !msg.text || !msg.project) return;
-    harness.prompt(msg.project, msg.text); // fire-and-forget; it emits its own events
+    let frame;
+    try { frame = JSON.parse(raw.toString()); } catch { return; }
+    const { ok, value } = validateInbound(frame);
+    if (!ok) return; // ignore anything not a valid inbound message
+    if (value.type === IN.USER) harness.prompt(value.project, value.text); // fire-and-forget; emits its own events
+    else if (value.type === IN.ABORT) harness.abort(value.project);
   });
 });
 

@@ -218,6 +218,21 @@
   button.send:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
   button.send:disabled { opacity: 0.4; cursor: default; background: var(--color-accent-dim); }
 
+  /* stop/cancel — only shown while the active lead's turn is in flight */
+  button.stop {
+    background: transparent; color: var(--color-danger);
+    border: 1px solid color-mix(in oklch, var(--color-danger) 40%, var(--color-line));
+    border-radius: var(--radius-md);
+    padding: 0 var(--space-lg); min-height: 38px;
+    font: inherit; font-weight: 600; font-size: var(--text-base);
+    letter-spacing: 0.01em; cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  }
+  button.stop:hover { background: color-mix(in oklch, var(--color-danger) 14%, transparent); }
+  button.stop:active { transform: translateY(1px); }
+  button.stop:focus-visible { outline: 2px solid var(--color-danger); outline-offset: 2px; }
+  button.stop[hidden] { display: none; }
+
   @keyframes pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
   @keyframes msg-in {
     from { opacity: 0; transform: translateY(4px); }
@@ -462,7 +477,7 @@
                max(var(--space-md), env(safe-area-inset-left));
     }
     textarea { font-size: 16px; }
-    button.send { min-height: 44px; padding: 0 var(--space-md); }
+    button.send, button.stop { min-height: 44px; padding: 0 var(--space-md); }
   }
 
   /* ---- inspector drawer (harness state) ---- */
@@ -640,6 +655,7 @@
     <footer>
       <form id="f">
         <textarea id="in" rows="1" placeholder="Message the lead…" autofocus></textarea>
+        <button class="stop" id="stop" type="button" hidden>Stop</button>
         <button class="send" id="send" type="submit">Send</button>
       </form>
     </footer>
@@ -753,6 +769,7 @@
   const input = document.getElementById("in");
   const form = document.getElementById("f");
   const sendBtn = document.getElementById("send");
+  const stopBtn = document.getElementById("stop");
   const conn = document.getElementById("conn");
   const activeName = document.getElementById("activeName");
   const activeDir = document.getElementById("activeDir");
@@ -788,6 +805,16 @@
     st.logEl.scrollTop = st.logEl.scrollHeight;
     return d;
   }
+
+  // Composer reflects the active lead's turn state: Send disabled + Stop shown
+  // while its turn is in flight (between `typing` and `done`/`error`).
+  function syncComposer() {
+    const st = active ? P.get(active) : null;
+    const busy = !!(st && st.busy);
+    sendBtn.disabled = busy;
+    stopBtn.hidden = !busy;
+  }
+  stopBtn.onclick = () => { if (active) client.sendAbort(active); };
 
   // ---- status line (per project) ----
   function renderStatus(st) {
@@ -837,7 +864,7 @@
     for (const s of P.values()) s.logEl.classList.toggle("active", s.id === id);
     activeName.textContent = p ? p.name : "—";
     activeDir.textContent = p ? p.dir : "";
-    sendBtn.disabled = st.busy;
+    syncComposer();
     renderSidebar();
     if (inspectorOpen) refreshInspector();
     input.focus();
@@ -1069,8 +1096,13 @@
     inspStats.innerHTML = stats.join("");
 
     const log = st.toolLog.slice(-60);
+    const mark = (e) => e.ok == null
+      ? '' // still running — no marker
+      : e.ok
+        ? ' <span style="color:var(--color-accent)">✓</span>'
+        : ' <span style="color:var(--color-danger)">✗</span>';
     inspToolLog.innerHTML = log.length
-      ? log.map((e) => `<div class="tl ${e.agent ? "agent" : ""}"><span class="tl-t">${fmtAt(st, e.at)}</span><code>${esc(e.tool)}</code></div>`).join("")
+      ? log.map((e) => `<div class="tl ${e.agent ? "agent" : ""}"><span class="tl-t">${fmtAt(st, e.at)}</span><code>${esc(e.tool)}${mark(e)}</code></div>`).join("")
       : '<span class="tl-none">no tool calls yet</span>';
     inspToolLog.scrollTop = inspToolLog.scrollHeight;
 
@@ -1149,14 +1181,22 @@
 
   onFrame(OUT.TYPING, (m, st) => {
     st.busy = true; startStatus(st);
-    if (m.project === active) sendBtn.disabled = true;
+    if (m.project === active) syncComposer();
     renderSidebar();
   });
   onFrame(OUT.STEP, (m, st) => {
     const agent = isAgentTool(m.tool);
     if (agent) st.agents++; else st.steps++;
-    st.toolLog.push({ tool: m.tool || "?", at: Date.now(), agent });
+    // track the running tool by id so tool_end can pair + mark it
+    st.toolLog.push({ tool: m.tool || "?", at: Date.now(), agent, id: m.toolCallId, ok: null });
     if (st.toolLog.length > 200) st.toolLog.shift();
+    renderStatus(st);
+  });
+  onFrame(OUT.TOOL_END, (m, st) => {
+    // pair by toolCallId; fall back to the most recent still-running step
+    let e = m.toolCallId && st.toolLog.find((x) => x.id === m.toolCallId);
+    if (!e) for (let i = st.toolLog.length - 1; i >= 0; i--) { if (st.toolLog[i].ok == null) { e = st.toolLog[i]; break; } }
+    if (e) e.ok = !!m.ok;
     renderStatus(st);
   });
   onFrame(OUT.USAGE, (m, st) => {
@@ -1179,13 +1219,13 @@
   });
   onFrame(OUT.DONE, (m, st) => {
     finishStatus(st); st.leadBubble = null; st.busy = false;
-    if (m.project === active) sendBtn.disabled = false;
+    if (m.project === active) syncComposer();
     renderSidebar();
   });
   onFrame(OUT.ERROR, (m, st) => {
     finishStatus(st); st.leadBubble = null; st.busy = false;
     bubble(st, "msg lead", "⚠️ " + m.text);
-    if (m.project === active) sendBtn.disabled = false;
+    if (m.project === active) syncComposer();
     renderSidebar();
   });
 

@@ -68,6 +68,9 @@ export function createClient(harnessUrl) {
         sendUser(project, text) {
           client.sendUser(project, text);
         },
+        sendAbort(project) {
+          client.sendAbort(project);
+        },
         close() {
           client.close();
         },

@@ -22,6 +22,7 @@ const emptySession = () => ({
   busy: false,
   unread: false, // lead replied while this repo was in the background
   lastTool: "", // most recent tool the lead invoked (for the status line)
+  toolRuns: [], // { id, tool, ok } — ok: null running · true done · false errored
   steps: 0,
   agents: 0,
   tokensIn: 0,
@@ -117,13 +118,23 @@ export function App({ harnessUrl }) {
         if (!id) return;
         switch (m.type) {
           case OUT.TYPING:
-            patchSession(id, () => ({ busy: true, streaming: "", steps: 0, agents: 0, tokensIn: 0, tokensOut: 0, lastTool: "" }));
+            patchSession(id, () => ({ busy: true, streaming: "", steps: 0, agents: 0, tokensIn: 0, tokensOut: 0, lastTool: "", toolRuns: [] }));
             break;
           case OUT.DELTA:
             patchSession(id, (s) => ({ streaming: s.streaming + (m.text || "") }));
             break;
           case OUT.STEP:
-            patchSession(id, (s) => ({ steps: s.steps + 1, lastTool: m.tool || s.lastTool }));
+            patchSession(id, (s) => ({
+              steps: s.steps + 1,
+              lastTool: m.tool || s.lastTool,
+              // track the running tool by id (cap the list) so tool_end can pair it
+              toolRuns: [...s.toolRuns, { id: m.toolCallId, tool: m.tool || "?", ok: null }].slice(-50),
+            }));
+            break;
+          case OUT.TOOL_END:
+            patchSession(id, (s) => ({
+              toolRuns: s.toolRuns.map((t) => (t.id === m.toolCallId ? { ...t, ok: !!m.ok } : t)),
+            }));
             break;
           case OUT.SUBAGENT:
             if (m.phase === "start") patchSession(id, (s) => ({ agents: s.agents + 1, lastTool: "subagent" }));
@@ -284,6 +295,14 @@ export function App({ harnessUrl }) {
     if (mode !== "chat") {
       if (key.escape) setMode("chat");
       return; // modal owns the rest of the keys
+    }
+    // Esc aborts the in-flight turn for the active repo (no-op when idle).
+    if (key.escape) {
+      if (sess.busy && activeId) {
+        conn.current?.sendAbort(activeId);
+        flash("stopping…");
+      }
+      return;
     }
     if (key.tab && key.shift) return cycleProject(-1);
     if (key.tab) return cycleProject(1);
@@ -453,7 +472,11 @@ function ChatLog({ view, width, height, project }) {
 // --- StatusLine --------------------------------------------------------------
 function StatusLine({ session, config, notice, scrolled }) {
   const rightDefault = config ? `${config.model} · ${config.thinking}` : "";
-  const tool = session.busy && session.lastTool ? ` · ⚙ ${session.lastTool}` : "";
+  // Newest tool run drives the marker: ⚙ running · ✓ ok · ✗ errored (paired by id).
+  const lastRun = session.toolRuns && session.toolRuns.length ? session.toolRuns[session.toolRuns.length - 1] : null;
+  const runName = lastRun ? lastRun.tool : session.lastTool;
+  const runMark = lastRun ? (lastRun.ok == null ? "⚙" : lastRun.ok ? "✓" : "✗") : "⚙";
+  const runColor = lastRun && lastRun.ok === false ? "red" : "gray";
   return html`
     <${Box} paddingX=${1} justifyContent="space-between">
       <${Box}>
@@ -463,8 +486,12 @@ function StatusLine({ session, config, notice, scrolled }) {
         ${session.busy || session.steps || session.agents
           ? html`<${Text} color="gray">  ·  ${session.steps} tools${session.agents ? ` · ${session.agents} agents` : ""}${
               session.tokensOut ? ` · ${session.tokensIn + session.tokensOut} tok` : ""
-            }${tool}<//>`
+            }<//>`
           : null}
+        ${session.busy && runName
+          ? html`<${Text} color=${runColor}>  ·  ${runMark} ${runName}<//>`
+          : null}
+        ${session.busy ? html`<${Text} color="yellow" dimColor>  ·  esc to stop<//>` : null}
         ${scrolled ? html`<${Text} color="cyan">  ·  ⇅ scrolled<//>` : null}
       <//>
       <${Text} color=${notice ? "magenta" : "gray"} dimColor=${!notice}>

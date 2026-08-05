@@ -54,6 +54,21 @@ test("full outbound vocabulary round-trips through builders + schemas", () => {
   }
 });
 
+test("tool lifecycle: step (with id/args) + tool_end round-trip", () => {
+  const start = msg.step("/p", "bash", "call-9", { cmd: "ls" });
+  assert.equal(start.toolCallId, "call-9");
+  assert.ok(validateOutbound(start).ok, validateOutbound(start).error);
+  // step id/args are optional — bare step still validates
+  assert.ok(validateOutbound(msg.step("/p", "bash")).ok);
+
+  const end = msg.toolEnd("/p", "call-9", "bash", true);
+  const r = validateOutbound(end);
+  assert.ok(r.ok, r.error);
+  assert.equal(r.value.ok, true);
+  // tool_end requires toolCallId + ok
+  assert.equal(validateOutbound({ type: OUT.TOOL_END, project: "/p", tool: "bash" }).ok, false);
+});
+
 test("subagent discriminated union rejects mixed shapes", () => {
   // phase:start must not carry end-only fields as its whole shape
   assert.equal(validateOutbound({ type: OUT.SUBAGENT, project: "/p", id: "x", phase: "start" }).ok, false); // missing task

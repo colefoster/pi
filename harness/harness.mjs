@@ -316,7 +316,10 @@ export async function createHarness() {
         break;
       }
       case "tool_execution_start":
-        emit(msg.step(projectId, event.toolName));
+        emit(msg.step(projectId, event.toolName, event.toolCallId, event.args));
+        break;
+      case "tool_execution_end":
+        emit(msg.toolEnd(projectId, event.toolCallId, event.toolName, !event.isError));
         break;
       case "turn_end": {
         const m = event.message;
@@ -399,6 +402,18 @@ export async function createHarness() {
     }
   }
 
+  // Cancel a project's in-flight turn (if any). No-op when the lead isn't live
+  // or isn't busy. The aborted prompt() rejects and surfaces its own event.
+  async function abort(projectId) {
+    if (!leads.has(projectId)) return;
+    try {
+      const lead = await leads.get(projectId);
+      if (lead?.busy) await lead.session.abort();
+    } catch {
+      // a lead mid-creation or a benign abort race — nothing to cancel
+    }
+  }
+
   // Conversation backscroll for a project's lead, so a freshly-connected client
   // (the TUI) can render history instead of only future events. Reads the SDK's
   // persisted session.messages and flattens to { role, text, ts } — only the
@@ -478,5 +493,6 @@ export async function createHarness() {
     getManifest,
     getMessages,
     prompt,
+    abort,
   };
 }

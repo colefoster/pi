@@ -534,6 +534,8 @@
   .ev .em { color: var(--color-dim); min-width: 0; word-break: break-word; }
   .ev.step .ek { color: var(--color-accent-dim); }
   .ev.step .em code { color: var(--color-txt); }
+  .ev.tool_end .ek { color: var(--color-dim); }
+  .ev.tool_end .em code { color: var(--color-txt); }
   .ev.subagent .ek, .ev.subagent .em { color: var(--color-accent); }
   .ev.usage .ek { color: var(--color-dim); }
   .ev.delta .em { color: var(--color-txt); }
@@ -1290,6 +1292,13 @@
     const agent = isAgentTool(m.tool);
     if (st) { if (agent) st.agents++; else st.steps++; st.lastAt = Date.now(); }
     pushEvent(OUT.STEP, m.project, `<code>${esc(m.tool || "?")}</code>`);
+  });
+  onFrame(OUT.TOOL_END, (m, st) => {
+    if (st) st.lastAt = Date.now();
+    const badge = m.ok
+      ? `<span style="color:var(--color-accent)">✓ ok</span>`
+      : `<span style="color:var(--color-danger)">✗ err</span>`;
+    pushEvent(OUT.TOOL_END, m.project, `<code>${esc(m.tool || "?")}</code> ${badge}`);
   });
   onFrame(OUT.USAGE, (m, st) => {
     if (st) { st.tokens += (m.input || 0) + (m.output || 0); st.lastAt = Date.now(); }

@@ -21,7 +21,20 @@ export const OUTBOUND_SCHEMAS = {
   }),
   [OUT.TYPING]: z.object({ type: z.literal(OUT.TYPING), project }),
   [OUT.DELTA]: z.object({ type: z.literal(OUT.DELTA), project, text: z.string() }),
-  [OUT.STEP]: z.object({ type: z.literal(OUT.STEP), project, tool: z.string() }),
+  [OUT.STEP]: z.object({
+    type: z.literal(OUT.STEP),
+    project,
+    tool: z.string(),
+    toolCallId: z.string().optional(),
+    args: z.any().optional(),
+  }),
+  [OUT.TOOL_END]: z.object({
+    type: z.literal(OUT.TOOL_END),
+    project,
+    toolCallId: z.string(),
+    tool: z.string(),
+    ok: z.boolean(),
+  }),
   [OUT.USAGE]: z.object({
     type: z.literal(OUT.USAGE),
     project,
