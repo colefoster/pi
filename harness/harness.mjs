@@ -78,10 +78,18 @@ function loadProjects() {
 function saveProjects(list) {
   writeFileSync(PROJECTS_FILE, JSON.stringify(list, null, 2));
 }
+// Optional allowlist root: when PI_PROJECT_ROOT is set, only directories under
+// it can be registered, so the control API can't point a lead at ~/.ssh or /.
+const PROJECT_ROOT = process.env.PI_PROJECT_ROOT ? resolve(expandHome(process.env.PI_PROJECT_ROOT)) : "";
+function withinRoot(abs) {
+  if (!PROJECT_ROOT) return true;
+  return abs === PROJECT_ROOT || abs.startsWith(PROJECT_ROOT + "/");
+}
 function addProject({ name, dir }) {
   const raw = String(dir || "").trim();
   if (!raw) throw new Error("dir is required");
   const abs = resolve(expandHome(raw));
+  if (!withinRoot(abs)) throw new Error(`dir must be under ${PROJECT_ROOT}`);
   if (!existsSync(abs) || !statSync(abs).isDirectory()) {
     throw new Error(`not a directory: ${abs}`);
   }

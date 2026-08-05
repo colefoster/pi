@@ -14,6 +14,26 @@ const PORT = Number(process.env.HARNESS_PORT || 5179);
 // HARNESS_HOST=0.0.0.0 only if running the harness on a separate box.
 const HOST = process.env.HARNESS_HOST || "127.0.0.1";
 
+// Shared-secret auth. When HARNESS_TOKEN is set, every request (HTTP except
+// /health, and the WS upgrade) must present it — as `Authorization: Bearer <t>`,
+// an `x-pi-token` header, or a `?token=` query param (browsers can't set headers
+// on a WebSocket). When unset, auth is OFF and we say so loudly — fine for a
+// trusted localhost box, not for anything exposed.
+const TOKEN = process.env.HARNESS_TOKEN || "";
+if (!TOKEN) console.warn("[harness] ⚠ HARNESS_TOKEN not set — running WITHOUT auth (localhost only)");
+
+function tokenFrom(req) {
+  const auth = req.headers?.["authorization"];
+  if (typeof auth === "string" && auth.startsWith("Bearer ")) return auth.slice(7);
+  const hdr = req.headers?.["x-pi-token"];
+  if (typeof hdr === "string" && hdr) return hdr;
+  try { return new URL(req.url, "http://localhost").searchParams.get("token") || ""; } catch { return ""; }
+}
+function authOk(req) {
+  if (!TOKEN) return true;
+  return tokenFrom(req) === TOKEN;
+}
+
 let harness;
 try {
   harness = await createHarness();
@@ -40,6 +60,9 @@ const httpServer = createServer(async (req, res) => {
   const url = (req.url || "/").split("?")[0];
 
   if (url === "/health") return json(res, 200, { ok: true });
+
+  // Everything else is behind the shared secret (no-op when auth is off).
+  if (!authOk(req)) return json(res, 401, { error: "unauthorized" });
 
   if (url === "/config" && req.method === "GET")
     return json(res, 200, await harness.getConfig());
@@ -116,7 +139,12 @@ harness.events.on("event", (obj) => {
 });
 
 const wss = new WebSocketServer({ server: httpServer });
-wss.on("connection", (ws) => {
+wss.on("connection", (ws, req) => {
+  // Reject the upgrade if the shared secret is wrong/absent (no-op when off).
+  if (!authOk(req)) {
+    try { ws.close(1008, "unauthorized"); } catch {}
+    return;
+  }
   clients.add(ws);
   // Without this, a dropped/reset socket emits 'error' with no listener, which
   // is fatal to the whole process (Node throws on unhandled 'error').

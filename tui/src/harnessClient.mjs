@@ -11,13 +11,14 @@
 import { createClient as createProtocolClient, PROTOCOL_VERSION } from "@pi/protocol";
 import { WebSocket } from "ws";
 
-export function createClient(harnessUrl) {
+export function createClient(harnessUrl, token = process.env.HARNESS_TOKEN || "") {
   const http = harnessUrl.replace(/\/$/, "");
   const wsUrl = http.replace(/^http/, "ws");
+  const authHeaders = token ? { "x-pi-token": token } : {};
 
   async function req(path, opts) {
     const res = await fetch(http + path, {
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...authHeaders },
       ...opts,
     });
     const text = await res.text();
@@ -50,6 +51,7 @@ export function createClient(harnessUrl) {
       const client = createProtocolClient({
         url: wsUrl,
         WebSocket,
+        token,
         onOpen: () => onStatus?.("open"),
         onClose: () => onStatus?.("closed"),
         // Prefer the app's UI channel; fall back to console only if none wired.

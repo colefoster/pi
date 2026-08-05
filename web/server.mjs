@@ -27,6 +27,12 @@ const PORT = Number(process.env.PORT || 5178);
 const HOST = process.env.HOST || "127.0.0.1";
 const HARNESS_HTTP = (process.env.HARNESS_URL || "http://localhost:5179").replace(/\/$/, "");
 const HARNESS_WS = HARNESS_HTTP.replace(/^http/, "ws");
+// The web bridge is a trusted client that holds the harness shared secret and
+// injects it on every hop to the harness. Browsers talk to this server (same
+// origin, localhost) and never see the token.
+const HARNESS_TOKEN = process.env.HARNESS_TOKEN || "";
+const authHeaders = HARNESS_TOKEN ? { "x-pi-token": HARNESS_TOKEN } : {};
+const wsUrlWithToken = HARNESS_TOKEN ? `${HARNESS_WS}?token=${encodeURIComponent(HARNESS_TOKEN)}` : HARNESS_WS;
 
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css" };
 const PROXY = new Set(["/config", "/projects", "/manifest", "/messages", "/health"]);
@@ -45,7 +51,7 @@ async function proxy(req, res) {
   try {
     const upstream = await fetch(HARNESS_HTTP + req.url, {
       method: req.method,
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...authHeaders },
       body,
     });
     const text = await upstream.text();
@@ -115,7 +121,7 @@ function broadcast(data) {
   }
 }
 function connectUpstream() {
-  upstream = new WebSocket(HARNESS_WS);
+  upstream = new WebSocket(wsUrlWithToken);
   upstream.on("open", () => console.log(`[web] connected to harness ${HARNESS_WS}`));
   upstream.on("message", (raw) => {
     // Harness sends its own per-connection "hello"; browsers get one synthesized
@@ -149,7 +155,7 @@ wss.on("connection", async (ws) => {
   });
   // Synthesize the hello the frontend expects on connect (projects from harness).
   try {
-    const projects = await (await fetch(HARNESS_HTTP + "/projects")).json();
+    const projects = await (await fetch(HARNESS_HTTP + "/projects", { headers: authHeaders })).json();
     if (ws.readyState === 1) ws.send(JSON.stringify(msg.hello(PROTOCOL_VERSION, projects)));
   } catch {
     if (ws.readyState === 1) ws.send(JSON.stringify(msg.hello(PROTOCOL_VERSION, [])));
