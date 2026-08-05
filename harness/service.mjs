@@ -71,12 +71,20 @@ const httpServer = createServer(async (req, res) => {
 const clients = new Set();
 harness.events.on("event", (obj) => {
   const s = JSON.stringify(obj);
-  for (const ws of clients) if (ws.readyState === 1) ws.send(s);
+  for (const ws of clients) {
+    if (ws.readyState !== 1) continue;
+    // One flaky client must never abort delivery to the rest, nor escape as
+    // an unhandled rejection back through emit().
+    try { ws.send(s); } catch { clients.delete(ws); }
+  }
 });
 
 const wss = new WebSocketServer({ server: httpServer });
 wss.on("connection", (ws) => {
   clients.add(ws);
+  // Without this, a dropped/reset socket emits 'error' with no listener, which
+  // is fatal to the whole process (Node throws on unhandled 'error').
+  ws.on("error", () => { clients.delete(ws); });
   ws.send(JSON.stringify({ type: "hello", projects: harness.listProjects() }));
   ws.on("close", () => clients.delete(ws));
   ws.on("message", (raw) => {

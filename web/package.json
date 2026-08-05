@@ -1,0 +1,16 @@
+{
+  "name": "@pi/web",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Browser UI for the pi-lead harness — a thin edge that proxies + bridges to the harness over HTTP/WS",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "dependencies": {
+    "ws": "^8.21.1"
+  }
+}

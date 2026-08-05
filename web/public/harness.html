@@ -1,0 +1,1321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Harness Control · pi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" />
+<style>
+  /* Hallmark · macrostructure: app-shell (control cockpit) · tone: atmospheric / late-night · anchor hue: cyan 202
+   * pre-emit critique: P5 H5 E5 S5 R5 V4
+   * theme: custom "late-night cockpit" (locked, shared with index.html) · tokens inlined for standalone use
+   * paper oklch(15.5% .012 245) · accent oklch(82% .13 202) cool · Space Grotesk + Inter + JetBrains Mono
+   */
+
+  /* ============================================================
+     TOKENS — verbatim from public/tokens.css (inlined for standalone)
+     ============================================================ */
+  :root {
+    /* ---- paper (dark, layered, cool) ---- */
+    --color-bg:        oklch(15.5% 0.012 245);
+    --color-side:      oklch(13%   0.013 245);
+    --color-panel:     oklch(18.5% 0.013 245);
+    --color-raised:    oklch(22%   0.014 245);
+    --color-me:        oklch(31%   0.045 222);
+
+    /* ---- rules ---- */
+    --color-line:      oklch(30%   0.014 245);
+    --color-line-soft: oklch(24%   0.012 245);
+
+    /* ---- ink ---- */
+    --color-txt:       oklch(93%   0.008 240);
+    --color-dim:       oklch(67%   0.014 240);
+    --color-faint:     oklch(52%   0.012 240);
+
+    /* ---- accent (cyan phosphor — used sparingly) ---- */
+    --color-accent:      oklch(82% 0.13 202);
+    --color-accent-dim:  oklch(72% 0.10 202);
+    --color-accent-ink:  oklch(19% 0.03 232);
+    --color-accent-glow: oklch(82% 0.13 202 / 0.28);
+    --color-danger:      oklch(72% 0.15 26);
+    --color-warn:        oklch(80% 0.12 85);
+
+    /* ---- type ---- */
+    --font-ui:      "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --font-display: "Space Grotesk", var(--font-ui);
+    --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", "SFMono-Regular", Menlo, monospace;
+
+    /* ---- text scale ---- */
+    --text-xs:   11.5px;
+    --text-sm:   13px;
+    --text-base: 14.5px;
+    --text-md:   15px;
+    --text-lg:   17px;
+    --text-xl:   22px;
+
+    /* ---- 4pt spacing ---- */
+    --space-2xs: 4px;
+    --space-xs:  6px;
+    --space-sm:  8px;
+    --space-md:  12px;
+    --space-lg:  16px;
+    --space-xl:  24px;
+    --space-2xl: 32px;
+
+    /* ---- radii ---- */
+    --radius-sm: 7px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+
+    /* ---- motion ---- */
+    --ease-out:    cubic-bezier(0.22, 0.61, 0.36, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --dur-fast: 120ms;
+    --dur-med:  200ms;
+  }
+
+  /* ============================================================
+     BASE
+     ============================================================ */
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; overflow-x: clip; }
+  body {
+    background: var(--color-bg);
+    color: var(--color-txt);
+    font: var(--text-md)/1.55 var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    display: flex; flex-direction: column;
+    min-height: 100dvh;
+  }
+  /* one soft atmospheric bloom, top-left — the only radial in the build */
+  body::before {
+    content: "";
+    position: fixed;
+    top: -20vh; left: -12vw;
+    width: 58vw; height: 62vh;
+    background: radial-gradient(closest-side, var(--color-accent-glow), transparent 72%);
+    opacity: 0.42;
+    pointer-events: none;
+    z-index: 0;
+  }
+  a { color: inherit; }
+  ::selection { background: var(--color-accent-glow); }
+  :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+  /* ============================================================
+     TOP BAR
+     ============================================================ */
+  .topbar {
+    position: sticky; top: 0; z-index: 30;
+    display: flex; align-items: center; gap: var(--space-md);
+    padding: var(--space-md) var(--space-xl);
+    border-bottom: 1px solid var(--color-line-soft);
+    background: color-mix(in oklch, var(--color-panel) 84%, transparent);
+    backdrop-filter: blur(10px);
+  }
+  .brand {
+    display: flex; align-items: center; gap: var(--space-sm);
+    font-family: var(--font-display); font-weight: 600;
+    font-size: var(--text-sm); letter-spacing: 0.14em;
+    color: var(--color-dim); text-transform: uppercase;
+  }
+  .brand::before {
+    content: ""; width: 9px; height: 9px; flex-shrink: 0;
+    border-radius: 2px; background: var(--color-accent);
+    box-shadow: 0 0 10px var(--color-accent-glow);
+  }
+  .brand .sub {
+    font-family: var(--font-display); font-weight: 600; font-size: var(--text-lg);
+    letter-spacing: -0.01em; text-transform: none; color: var(--color-txt);
+    padding-left: var(--space-sm); margin-left: var(--space-2xs);
+    border-left: 1px solid var(--color-line);
+  }
+  .topbar .spacer { flex: 1; }
+  .top-stat {
+    display: inline-flex; align-items: baseline; gap: var(--space-xs);
+    font-family: var(--font-mono); font-size: var(--text-xs);
+    color: var(--color-faint); font-variant-numeric: tabular-nums;
+  }
+  .top-stat b { color: var(--color-dim); font-weight: 500; }
+  .top-stat.sep { padding-left: var(--space-md); border-left: 1px solid var(--color-line-soft); }
+  .conn-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--color-faint);
+    transition: background var(--dur-med) var(--ease-out), box-shadow var(--dur-med) var(--ease-out);
+  }
+  .conn-dot.on { background: var(--color-accent); box-shadow: 0 0 9px var(--color-accent-glow); }
+  .top-back {
+    display: inline-flex; align-items: center; gap: var(--space-xs);
+    color: var(--color-dim); text-decoration: none; font-size: var(--text-sm);
+    padding: var(--space-2xs) var(--space-sm); border-radius: var(--radius-sm);
+    transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+  }
+  .top-back:hover { color: var(--color-txt); background: var(--color-raised); }
+
+  /* ============================================================
+     SHELL — nav rail · main · live rail
+     ============================================================ */
+  .shell {
+    flex: 1; min-height: 0;
+    display: grid;
+    grid-template-columns: 224px minmax(0, 1fr) 340px;
+    position: relative; z-index: 1;
+  }
+
+  /* ---- left nav rail ---- */
+  .nav {
+    border-right: 1px solid var(--color-line-soft);
+    background: var(--color-side);
+    padding: var(--space-lg) var(--space-sm);
+    display: flex; flex-direction: column; gap: 2px;
+    position: sticky; top: 57px; align-self: start;
+    height: calc(100dvh - 57px); overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: var(--color-line) transparent;
+  }
+  .nav-cap {
+    font-family: var(--font-mono); font-weight: 600; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-faint);
+    padding: var(--space-sm) var(--space-sm) var(--space-xs);
+  }
+  .nav-cap + .nav-cap { margin-top: var(--space-md); }
+  .nav-item {
+    display: flex; align-items: center; gap: var(--space-sm);
+    width: 100%; text-align: left;
+    background: none; border: 1px solid transparent; color: var(--color-dim);
+    font: inherit; font-size: var(--text-base); cursor: pointer;
+    padding: var(--space-sm) var(--space-md); border-radius: var(--radius-md);
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out);
+  }
+  .nav-item:hover { background: var(--color-raised); color: var(--color-txt); }
+  .nav-item:active { transform: translateY(0.5px); }
+  .nav-item.active {
+    background: var(--color-raised); color: var(--color-txt);
+    box-shadow: inset 2px 0 0 var(--color-accent);
+  }
+  .nav-item .ico { width: 16px; flex-shrink: 0; text-align: center; opacity: 0.9; font-size: 13px; }
+  .nav-item .lbl { flex: 1; }
+  .nav-item .badge {
+    font-family: var(--font-mono); font-size: 10px; color: var(--color-faint);
+    background: var(--color-bg); border: 1px solid var(--color-line-soft);
+    border-radius: 999px; padding: 0 var(--space-xs); font-variant-numeric: tabular-nums;
+  }
+  .nav-item.active .badge { color: var(--color-accent); border-color: var(--color-accent-dim); }
+
+  /* ---- main content column ---- */
+  .main { min-width: 0; padding: var(--space-2xl) var(--space-2xl) 96px; }
+  @media (max-width: 1200px) { .main { padding: var(--space-xl); } }
+
+  .section { display: none; flex-direction: column; gap: var(--space-2xl); animation: sec-in var(--dur-med) var(--ease-out) both; }
+  .section.active { display: flex; }
+  @keyframes sec-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .sec-head { display: flex; flex-direction: column; gap: var(--space-2xs); }
+  .sec-head h1 {
+    margin: 0; font-family: var(--font-display); font-weight: 600;
+    font-size: var(--text-xl); letter-spacing: -0.015em;
+    overflow-wrap: anywhere; min-width: 0;
+  }
+  .sec-head p { margin: 0; color: var(--color-dim); font-size: var(--text-base); max-width: 68ch; }
+
+  .block { display: flex; flex-direction: column; gap: var(--space-md); }
+  .block-title {
+    margin: 0; font-family: var(--font-mono); font-weight: 600; font-size: var(--text-xs);
+    text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-faint);
+    display: flex; align-items: center; gap: var(--space-sm);
+  }
+  .block-title .n { color: var(--color-dim); }
+
+  /* ---- card ---- */
+  .card {
+    background: color-mix(in oklch, var(--color-panel) 70%, var(--color-bg));
+    border: 1px solid var(--color-line-soft); border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+  }
+  .card.pad-lg { padding: var(--space-xl); }
+
+  /* ---- stat grid ---- */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-md); }
+  .stat {
+    background: color-mix(in oklch, var(--color-panel) 70%, var(--color-bg));
+    border: 1px solid var(--color-line-soft); border-radius: var(--radius-md);
+    padding: var(--space-md) var(--space-lg); display: flex; flex-direction: column; gap: 2px;
+  }
+  .stat .k {
+    font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--color-faint);
+  }
+  .stat .v {
+    font-family: var(--font-display); font-weight: 600; font-size: var(--text-xl);
+    letter-spacing: -0.01em; color: var(--color-txt); font-variant-numeric: tabular-nums;
+    display: flex; align-items: baseline; gap: var(--space-xs);
+  }
+  .stat .v .u { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 400; color: var(--color-faint); }
+  .stat .v.accent { color: var(--color-accent); }
+  .stat .foot { font-size: var(--text-xs); color: var(--color-dim); }
+
+  /* ---- health rows ---- */
+  .hrow {
+    display: flex; align-items: center; gap: var(--space-md);
+    padding: var(--space-md) 0;
+  }
+  .hrow + .hrow { border-top: 1px solid var(--color-line-soft); }
+  .hrow .light { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--color-faint); }
+  .hrow .light.ok { background: var(--color-accent); box-shadow: 0 0 8px var(--color-accent-glow); }
+  .hrow .light.warn { background: var(--color-warn); }
+  .hrow .light.err { background: var(--color-danger); }
+  .hrow .hlabel { flex: 1; font-size: var(--text-base); color: var(--color-txt); }
+  .hrow .hlabel small { display: block; color: var(--color-faint); font-size: var(--text-xs); }
+  .hrow .hval { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-dim); text-align: right; }
+
+  /* ============================================================
+     SHARED FORM / BUTTON / SWITCH (from index.html idioms)
+     ============================================================ */
+  .btn {
+    font: inherit; font-size: var(--text-base); font-weight: 600;
+    border-radius: var(--radius-md); padding: 0 var(--space-lg); min-height: 38px;
+    cursor: pointer; border: 1px solid transparent; letter-spacing: 0.01em;
+    display: inline-flex; align-items: center; gap: var(--space-xs);
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  }
+  .btn.primary { background: var(--color-accent); color: var(--color-accent-ink); }
+  .btn.primary:hover { background: color-mix(in oklch, var(--color-accent) 86%, white); }
+  .btn.ghost { background: transparent; color: var(--color-dim); border-color: var(--color-line); }
+  .btn.ghost:hover { color: var(--color-txt); border-color: var(--color-dim); }
+  .btn.danger { background: transparent; color: var(--color-danger); border-color: color-mix(in oklch, var(--color-danger) 40%, var(--color-line)); }
+  .btn.danger:hover { background: color-mix(in oklch, var(--color-danger) 14%, transparent); }
+  .btn.sm { min-height: 30px; padding: 0 var(--space-md); font-size: var(--text-sm); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+
+  .field { display: flex; flex-direction: column; gap: var(--space-2xs); }
+  .field-label { font-size: var(--text-sm); color: var(--color-dim); }
+  .field-label em { font-style: normal; color: var(--color-faint); font-size: var(--text-xs); }
+  .field-input {
+    background: var(--color-bg); color: var(--color-txt);
+    border: 1px solid var(--color-line); border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+    font: var(--text-base)/1.4 var(--font-ui); width: 100%;
+    transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+  }
+  .field-input.mono { font-family: var(--font-mono); }
+  .field-input::placeholder { color: var(--color-faint); }
+  .field-input:focus { outline: none; border-color: var(--color-accent-dim); box-shadow: 0 0 0 3px var(--color-accent-glow); }
+  select.field-input {
+    cursor: pointer; appearance: none; -webkit-appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--color-dim) 50%),
+                      linear-gradient(135deg, var(--color-dim) 50%, transparent 50%);
+    background-position: right 15px center, right 10px center;
+    background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+    padding-right: var(--space-xl);
+  }
+
+  .switch-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); cursor: pointer; }
+  .switch-row > span { display: flex; flex-direction: column; gap: 2px; font-size: var(--text-base); }
+  .switch-row small { color: var(--color-faint); font-size: var(--text-xs); }
+  .switch {
+    appearance: none; -webkit-appearance: none; margin: 0;
+    width: 40px; height: 24px; flex-shrink: 0; border-radius: 999px;
+    background: var(--color-line); position: relative; cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: 18px; height: 18px; border-radius: 50%; background: var(--color-dim);
+    transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+  }
+  .switch:checked { background: var(--color-accent); }
+  .switch:checked::after { transform: translateX(16px); background: var(--color-accent-ink); }
+
+  /* ---- segmented control (thinking level) ---- */
+  .seg { display: inline-flex; flex-wrap: wrap; gap: 3px; padding: 3px; background: var(--color-bg);
+    border: 1px solid var(--color-line); border-radius: var(--radius-md); }
+  .seg button {
+    font: inherit; font-family: var(--font-mono); font-size: var(--text-xs);
+    text-transform: lowercase; letter-spacing: 0.02em;
+    background: none; border: 0; color: var(--color-dim); cursor: pointer;
+    padding: var(--space-xs) var(--space-md); border-radius: var(--radius-sm);
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  }
+  .seg button:hover { color: var(--color-txt); }
+  .seg button.on { background: var(--color-accent); color: var(--color-accent-ink); font-weight: 500; }
+
+  /* ---- pending / applies-next-turn banner ---- */
+  .pending {
+    display: flex; align-items: flex-start; gap: var(--space-sm);
+    border: 1px solid var(--color-accent-dim); border-radius: var(--radius-md);
+    background: color-mix(in oklch, var(--color-accent) 8%, var(--color-bg));
+    padding: var(--space-sm) var(--space-md); font-size: var(--text-sm); color: var(--color-txt);
+  }
+  .pending .pico { color: var(--color-accent); flex-shrink: 0; margin-top: 1px; }
+  .pending small { color: var(--color-dim); }
+  .pending[hidden] { display: none; }
+
+  /* ---- chips ---- */
+  .chips { display: flex; flex-wrap: wrap; gap: var(--space-2xs); }
+  .chip {
+    display: inline-flex; align-items: baseline; gap: var(--space-2xs);
+    padding: 3px var(--space-sm); border-radius: var(--radius-sm);
+    background: var(--color-bg); border: 1px solid var(--color-line-soft);
+    font-family: var(--font-mono); font-size: var(--text-xs);
+  }
+  .chip b { color: var(--color-faint); font-weight: 500; letter-spacing: 0.04em; }
+  .chip span { color: var(--color-txt); }
+  .chip.accent { border-color: var(--color-accent-dim); }
+  .chip.accent span { color: var(--color-accent); }
+  .tag {
+    font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--color-faint); border: 1px solid var(--color-line-soft);
+    border-radius: 999px; padding: 1px 7px;
+  }
+  .tag.custom { color: var(--color-accent); border-color: var(--color-accent-dim); }
+  .tag.warn { color: var(--color-warn); border-color: color-mix(in oklch, var(--color-warn) 45%, var(--color-line-soft)); }
+
+  /* ---- kv rows ---- */
+  .kv { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-md); padding: var(--space-xs) 0; }
+  .kv + .kv { border-top: 1px solid var(--color-line-soft); }
+  .kv .kk { color: var(--color-dim); font-size: var(--text-base); }
+  .kv .kk small { display: block; color: var(--color-faint); font-size: var(--text-xs); }
+  .kv code { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-txt); text-align: right; word-break: break-all; }
+
+  /* ---- two-column grid ---- */
+  .cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-lg); }
+
+  /* ============================================================
+     TOOLS INSPECTOR
+     ============================================================ */
+  .tool-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
+  .tool-search { flex: 1; min-width: 200px; position: relative; }
+  .tool-search .field-input { padding-left: var(--space-xl); }
+  .tool-search::before {
+    content: "⌕"; position: absolute; left: var(--space-md); top: 50%; transform: translateY(-50%);
+    color: var(--color-faint); font-size: 15px; pointer-events: none;
+  }
+  .filter-pills { display: inline-flex; gap: 3px; padding: 3px; background: var(--color-bg);
+    border: 1px solid var(--color-line); border-radius: var(--radius-md); }
+  .filter-pills button {
+    font: inherit; font-size: var(--text-sm); background: none; border: 0; color: var(--color-dim);
+    cursor: pointer; padding: var(--space-2xs) var(--space-md); border-radius: var(--radius-sm);
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  }
+  .filter-pills button:hover { color: var(--color-txt); }
+  .filter-pills button.on { background: var(--color-raised); color: var(--color-txt); }
+
+  details.tool {
+    background: color-mix(in oklch, var(--color-panel) 65%, var(--color-bg));
+    border: 1px solid var(--color-line-soft); border-radius: var(--radius-md); overflow: hidden;
+  }
+  details.tool + details.tool { margin-top: var(--space-xs); }
+  details.tool > summary {
+    display: flex; align-items: center; gap: var(--space-sm);
+    padding: var(--space-md); cursor: pointer; list-style: none;
+  }
+  details.tool > summary::-webkit-details-marker { display: none; }
+  details.tool > summary::before {
+    content: "▸"; color: var(--color-faint); font-size: var(--text-xs);
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+  details.tool[open] > summary::before { transform: rotate(90deg); }
+  details.tool:hover { border-color: var(--color-line); }
+  .tname { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-txt); flex-shrink: 0; }
+  .tsum-desc {
+    flex: 1; min-width: 0; color: var(--color-faint); font-size: var(--text-xs);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .tsum-badges { display: inline-flex; align-items: center; gap: var(--space-2xs); flex-shrink: 0; }
+  .avail { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em; padding: 1px 6px;
+    border-radius: 999px; border: 1px solid var(--color-line-soft); color: var(--color-faint); }
+  .avail.lead { color: var(--color-accent); border-color: var(--color-accent-dim); }
+  /* full box reset — the bare `.sub` run-card rule otherwise hijacks padding/radius/background here */
+  .avail.sub { color: var(--color-dim); background: none; border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 6px; }
+  .tbody { padding: 0 var(--space-md) var(--space-md); display: flex; flex-direction: column; gap: var(--space-md); }
+  .tbody .tdesc { margin: 0; color: var(--color-dim); font-size: var(--text-sm); line-height: 1.5; }
+  .tsub-h { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--color-faint); margin: 0 0 var(--space-2xs); }
+  .guide-list { margin: 0; padding-left: var(--space-lg); display: flex; flex-direction: column; gap: 3px; }
+  .guide-list li { color: var(--color-dim); font-size: var(--text-sm); line-height: 1.45; }
+  pre.schema {
+    margin: 0; overflow: auto; max-height: 320px;
+    background: var(--color-bg); border: 1px solid var(--color-line-soft); border-radius: var(--radius-md);
+    padding: var(--space-md); font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55; color: var(--color-dim);
+    scrollbar-width: thin; scrollbar-color: var(--color-line) transparent;
+  }
+  pre.schema .k { color: var(--color-accent-dim); }
+  pre.schema .s { color: var(--color-txt); }
+  pre.schema .n { color: var(--color-warn); }
+  .schema-toggle {
+    font: inherit; font-family: var(--font-mono); font-size: var(--text-xs);
+    background: none; border: 0; color: var(--color-accent-dim); cursor: pointer; padding: 0;
+    align-self: flex-start;
+  }
+  .schema-toggle:hover { color: var(--color-accent); }
+
+  /* ============================================================
+     SUB-AGENT RUNS + LEADS
+     ============================================================ */
+  .sub {
+    background: color-mix(in oklch, var(--color-panel) 65%, var(--color-bg));
+    border: 1px solid var(--color-line-soft);
+    border-left: 2px solid var(--color-accent-dim);
+    border-radius: var(--radius-md); padding: var(--space-md) var(--space-lg);
+  }
+  .sub + .sub { margin-top: var(--space-sm); }
+  .sub-top { display: flex; align-items: center; gap: var(--space-sm); }
+  .sub-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: var(--color-line); }
+  .sub.running { border-left-color: var(--color-accent); }
+  .sub.running .sub-dot { background: var(--color-accent); box-shadow: 0 0 8px var(--color-accent-glow);
+    animation: pulse 1.4s var(--ease-in-out) infinite; }
+  .sub.error { border-left-color: var(--color-danger); }
+  .sub.error .sub-dot { background: var(--color-danger); }
+  .sub-task { flex: 1; min-width: 0; font-size: var(--text-base); color: var(--color-txt); line-height: 1.45; }
+  .sub-meta { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; }
+  .sub-t { font-family: var(--font-mono); font-size: 10px; color: var(--color-faint); font-variant-numeric: tabular-nums; }
+  .sub-res {
+    margin-top: var(--space-sm); font-size: var(--text-sm); line-height: 1.5; color: var(--color-dim);
+    padding-top: var(--space-sm); border-top: 1px solid var(--color-line-soft);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .sub-res .rk { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-faint); }
+  .st-badge { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; padding: 1px 7px; border-radius: 999px; }
+  .st-badge.running { color: var(--color-accent); border: 1px solid var(--color-accent-dim); }
+  .st-badge.done { color: var(--color-dim); border: 1px solid var(--color-line); }
+  .st-badge.error { color: var(--color-danger); border: 1px solid color-mix(in oklch, var(--color-danger) 45%, var(--color-line)); }
+
+  /* leads table */
+  .lead-row {
+    display: grid; grid-template-columns: 12px minmax(0,1.4fr) minmax(0,2fr) auto auto;
+    align-items: center; gap: var(--space-md);
+    padding: var(--space-md); border-radius: var(--radius-md);
+    border: 1px solid var(--color-line-soft);
+    background: color-mix(in oklch, var(--color-panel) 65%, var(--color-bg));
+  }
+  .lead-row + .lead-row { margin-top: var(--space-xs); }
+  .lead-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-line); }
+  .lead-dot.busy { background: var(--color-accent); box-shadow: 0 0 8px var(--color-accent-glow); animation: pulse 1.4s var(--ease-in-out) infinite; }
+  .lead-name { font-size: var(--text-base); color: var(--color-txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lead-dir { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lead-act { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-dim); text-align: right; white-space: nowrap; }
+  @media (max-width: 720px) {
+    .lead-row { grid-template-columns: 12px 1fr auto; }
+    .lead-dir, .lead-act { display: none; }
+  }
+
+  /* ============================================================
+     LIVE RAIL (persistent activity)
+     ============================================================ */
+  .live {
+    border-left: 1px solid var(--color-line-soft);
+    background: color-mix(in oklch, var(--color-side) 92%, transparent);
+    position: sticky; top: 57px; align-self: start;
+    height: calc(100dvh - 57px); display: flex; flex-direction: column;
+  }
+  .live-head {
+    display: flex; align-items: center; gap: var(--space-sm);
+    padding: var(--space-md) var(--space-lg); border-bottom: 1px solid var(--color-line-soft); flex-shrink: 0;
+  }
+  .live-head h2 { margin: 0; flex: 1; font-family: var(--font-display); font-weight: 600; font-size: var(--text-md); letter-spacing: -0.01em; }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent);
+    box-shadow: 0 0 8px var(--color-accent-glow); animation: pulse 1.4s var(--ease-in-out) infinite; }
+  .live-chips { display: flex; flex-wrap: wrap; gap: var(--space-2xs); padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--color-line-soft); flex-shrink: 0; }
+  .feed { flex: 1; overflow-y: auto; min-height: 0; padding: var(--space-md) var(--space-lg);
+    display: flex; flex-direction: column; gap: 1px; scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
+  .ev {
+    display: grid; grid-template-columns: 46px 62px 1fr; align-items: baseline; gap: var(--space-sm);
+    font-family: var(--font-mono); font-size: var(--text-xs); padding: 3px 0; line-height: 1.4;
+    animation: ev-in var(--dur-med) var(--ease-out) both;
+  }
+  @keyframes ev-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+  .ev .et { color: var(--color-faint); font-variant-numeric: tabular-nums; text-align: right; }
+  .ev .ek { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-faint); }
+  .ev .em { color: var(--color-dim); min-width: 0; word-break: break-word; }
+  .ev.step .ek { color: var(--color-accent-dim); }
+  .ev.step .em code { color: var(--color-txt); }
+  .ev.subagent .ek, .ev.subagent .em { color: var(--color-accent); }
+  .ev.usage .ek { color: var(--color-dim); }
+  .ev.delta .em { color: var(--color-txt); }
+  .ev.done .ek { color: var(--color-dim); }
+  .ev.error .ek, .ev.error .em { color: var(--color-danger); }
+  .live-foot { flex-shrink: 0; padding: var(--space-sm) var(--space-lg); border-top: 1px solid var(--color-line-soft);
+    font-family: var(--font-mono); font-size: 10px; color: var(--color-faint); display: flex; align-items: center; gap: var(--space-sm); }
+
+  /* ============================================================
+     RESPONSIVE
+     ============================================================ */
+  .nav-toggle, .live-toggle { display: none; }
+  @media (max-width: 1080px) {
+    .shell { grid-template-columns: 224px minmax(0, 1fr); }
+    .live { display: none; }
+    .live.show {
+      display: flex; position: fixed; top: 57px; right: 0; z-index: 40;
+      width: min(360px, 100vw); box-shadow: -24px 0 64px oklch(0% 0 0 / 0.45);
+      border-left: 1px solid var(--color-line);
+    }
+    .live-toggle { display: inline-flex; }
+  }
+  @media (max-width: 720px) {
+    .shell { grid-template-columns: 1fr; }
+    .nav {
+      position: static; height: auto; width: 100%;
+      flex-direction: row; overflow-x: auto; gap: var(--space-2xs);
+      border-right: 0; border-bottom: 1px solid var(--color-line-soft);
+      padding: var(--space-sm) var(--space-md); scrollbar-width: none;
+    }
+    .nav::-webkit-scrollbar { display: none; }
+    .nav-cap { display: none; }
+    .nav-item { width: auto; flex-shrink: 0; }
+    .nav-item .lbl { white-space: nowrap; }
+    .topbar { padding: var(--space-sm) var(--space-md); flex-wrap: wrap; }
+    .top-stat.opt { display: none; }
+    .main { padding: var(--space-lg) var(--space-md) 80px; }
+  }
+
+  @keyframes pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+  }
+  :root[data-reduce-motion] * , :root[data-reduce-motion] *::before, :root[data-reduce-motion] *::after {
+    animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important;
+  }
+</style>
+</head>
+<body>
+  <!-- ===================== TOP BAR ===================== -->
+  <div class="topbar">
+    <div class="brand">pi<span class="sub">Harness Control</span></div>
+    <div class="spacer"></div>
+    <span class="top-stat opt"><span class="conn-dot on" id="connDot"></span> <b>harness</b> online</span>
+    <span class="top-stat sep opt"><b>web</b> :5178</span>
+    <span class="top-stat opt"><b>harness</b> :5179</span>
+    <span class="top-stat sep"><b>leads</b> <span id="topLeads">5</span></span>
+    <button class="btn ghost sm live-toggle" id="liveToggle" type="button">Activity</button>
+    <a class="top-back" href="/index.html">‹ Leads</a>
+  </div>
+
+  <div class="shell">
+    <!-- ===================== NAV RAIL ===================== -->
+    <nav class="nav" id="nav">
+      <span class="nav-cap">Status</span>
+      <button class="nav-item active" data-sec="overview"><span class="ico">◉</span><span class="lbl">Overview</span></button>
+      <span class="nav-cap">Configuration</span>
+      <button class="nav-item" data-sec="model"><span class="ico">⚡</span><span class="lbl">Model &amp; Reasoning</span></button>
+      <button class="nav-item" data-sec="subagents"><span class="ico">⧉</span><span class="lbl">Sub-agents</span><span class="badge" id="navSubBadge">2</span></button>
+      <button class="nav-item" data-sec="tools"><span class="ico">⚒</span><span class="lbl">Tools</span><span class="badge" id="navToolBadge">8</span></button>
+      <button class="nav-item" data-sec="repos"><span class="ico">▤</span><span class="lbl">Repos / Leads</span><span class="badge" id="navRepoBadge">5</span></button>
+      <span class="nav-cap">Local</span>
+      <button class="nav-item" data-sec="prefs"><span class="ico">◐</span><span class="lbl">Preferences</span></button>
+      <button class="nav-item" data-sec="env"><span class="ico">⌗</span><span class="lbl">Environment</span></button>
+    </nav>
+
+    <!-- ===================== MAIN ===================== -->
+    <main class="main" id="main">
+
+      <!-- ---------- OVERVIEW ---------- -->
+      <section class="section active" data-sec="overview">
+        <div class="sec-head">
+          <h1>Overview</h1>
+          <p>Health and live state of the harness — the standalone agent service that owns the pi runtime, the leads, sub-agents, and the projects registry.</p>
+        </div>
+
+        <div class="stat-grid" id="statGrid"></div>
+
+        <div class="cols2">
+          <div class="block">
+            <h3 class="block-title">Health <span class="tag">GET /health</span></h3>
+            <div class="card" id="healthCard"></div>
+          </div>
+
+          <div class="block">
+            <h3 class="block-title">Per-lead status</h3>
+            <div class="card" id="ovLeads"></div>
+          </div>
+        </div>
+
+        <div class="block">
+          <h3 class="block-title">Recent events <span class="n" id="ovFeedNote">· live in the Activity rail →</span></h3>
+          <div class="card" style="padding: var(--space-md) var(--space-lg)">
+            <p style="margin:0;color:var(--color-dim);font-size:var(--text-sm)">The full streaming feed is pinned to the right. Each response reports <code style="font-family:var(--font-mono);color:var(--color-txt)">steps · time · tokens · N agents</code> — the harness emits <span style="font-family:var(--font-mono);color:var(--color-accent-dim)">delta · step · usage · subagent · typing · done · error</span> per project over the WS.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- MODEL & REASONING ---------- -->
+      <section class="section" data-sec="model">
+        <div class="sec-head">
+          <h1>Model &amp; Reasoning</h1>
+          <p>Shared across every lead. The dropdown lists the models your ChatGPT subscription exposes. Changes are validated, persisted to <code style="font-family:var(--font-mono)">settings.json</code>, and take effect on each lead's next message.</p>
+        </div>
+
+        <div class="pending" id="modelPending" hidden>
+          <span class="pico">◷</span>
+          <span><b>Pending — applies on next turn.</b> <small id="modelPendingText">Cached leads are dropped &amp; respawn with the new setting on their next message; any in-flight reply finishes on the old one.</small></span>
+        </div>
+
+        <div class="cols2">
+          <div class="block">
+            <h3 class="block-title">Provider</h3>
+            <div class="card">
+              <div class="field">
+                <span class="field-label">Provider <em>— from your subscription</em></span>
+                <select class="field-input mono" disabled><option>openai-codex</option></select>
+              </div>
+              <p style="margin:var(--space-sm) 0 0;font-size:var(--text-xs);color:var(--color-faint)">Runs on your ChatGPT/Codex login — no per-token API billing.</p>
+            </div>
+          </div>
+
+          <div class="block">
+            <h3 class="block-title">Model <span class="tag">GET /config</span></h3>
+            <div class="card">
+              <label class="field">
+                <span class="field-label">Model <em>— provider in parens</em></span>
+                <select class="field-input mono" id="cfgModel"></select>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="block">
+          <h3 class="block-title">Thinking level</h3>
+          <div class="card">
+            <div class="seg" id="thinkSeg" role="group" aria-label="Thinking level"></div>
+            <p style="margin:var(--space-md) 0 0;font-size:var(--text-sm);color:var(--color-dim)">Higher levels spend more reasoning tokens before replying. <code style="font-family:var(--font-mono);color:var(--color-txt)">off</code> disables reasoning; <code style="font-family:var(--font-mono);color:var(--color-txt)">max</code> is the deepest.</p>
+          </div>
+        </div>
+
+        <div class="block">
+          <h3 class="block-title">Effect on running leads</h3>
+          <div class="card" id="modelLeadEffect"></div>
+        </div>
+      </section>
+
+      <!-- ---------- SUB-AGENTS ---------- -->
+      <section class="section" data-sec="subagents">
+        <div class="sec-head">
+          <h1>Sub-agents</h1>
+          <p>A lead can delegate a read-only investigation to a cheaper, restricted sub-agent — its own model, its own toolset, its own system prompt. The lead stays on task while the dig runs; results fold back into the reply. The response status line counts these as <code style="font-family:var(--font-mono)">N agents</code>.</p>
+        </div>
+
+        <div class="cols2">
+          <div class="block">
+            <h3 class="block-title">Configuration</h3>
+            <div class="card pad-lg" style="display:flex;flex-direction:column;gap:var(--space-lg)">
+              <label class="switch-row">
+                <span>Enabled<small>Let leads delegate heavy read-only digs</small></span>
+                <input type="checkbox" class="switch" id="subEnabled" checked />
+              </label>
+              <div class="field">
+                <span class="field-label">Model <em>— cost-optimised</em></span>
+                <select class="field-input mono" id="subModel">
+                  <option value="gpt-5.4-mini" selected>gpt-5.4-mini (openai-codex)</option>
+                  <option value="gpt-5.4">gpt-5.4 (openai-codex)</option>
+                  <option value="gpt-5.3-codex-spark">gpt-5.3-codex-spark (openai-codex)</option>
+                </select>
+                <p style="margin:var(--space-2xs) 0 0;font-size:var(--text-xs);color:var(--color-faint)">Today fixed by <code style="font-family:var(--font-mono)">PI_SUBAGENT_MODEL</code>; provider inherited from the lead. This control promotes it to first-class.</p>
+              </div>
+              <div class="field">
+                <span class="field-label">Thinking</span>
+                <div class="seg" id="subThinkSeg" role="group" aria-label="Sub-agent thinking level"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="block">
+            <h3 class="block-title">Tool allow-list <span class="n">· read-only</span></h3>
+            <div class="card" style="display:flex;flex-direction:column;gap:var(--space-md)">
+              <p style="margin:0;font-size:var(--text-sm);color:var(--color-dim)">The sub-agent is confined to non-mutating tools. Write, edit, patch, and shell are withheld.</p>
+              <div class="chips" id="subToolChips"></div>
+              <div style="border-top:1px solid var(--color-line-soft);padding-top:var(--space-md)">
+                <p class="tsub-h">Withheld from sub-agents</p>
+                <div class="chips" id="subDenyChips"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="block">
+          <h3 class="block-title">System prompt</h3>
+          <div class="card" style="padding:0">
+            <pre class="schema" style="max-height:200px;border:0;background:transparent" id="subPrompt"></pre>
+          </div>
+        </div>
+
+        <div class="block">
+          <h3 class="block-title">Runs <span class="n">· live &amp; recent</span></h3>
+          <div id="subRuns"></div>
+        </div>
+      </section>
+
+      <!-- ---------- TOOLS ---------- -->
+      <section class="section" data-sec="tools">
+        <div class="sec-head">
+          <h1>Tools</h1>
+          <p>The manifest the harness hands the model. Each definition carries a name, description, JSON schema, and usage guidelines. <span class="avail lead" style="vertical-align:middle">lead</span> tools are available to leads; <span class="avail sub" style="vertical-align:middle">sub-agent</span> tools are also handed to sub-agents.</p>
+        </div>
+
+        <div class="tool-toolbar">
+          <div class="tool-search"><input class="field-input" id="toolSearch" placeholder="Search tools, descriptions, guidelines…" autocomplete="off" spellcheck="false" /></div>
+          <div class="filter-pills" id="toolFilter">
+            <button data-f="all" class="on">All</button>
+            <button data-f="builtin">Builtin</button>
+            <button data-f="custom">Custom</button>
+            <button data-f="sub">Sub-agent</button>
+          </div>
+        </div>
+        <div class="block-title" style="margin-top:calc(-1 * var(--space-md))"><span class="n" id="toolCount"></span></div>
+
+        <div id="toolList"></div>
+        <p id="toolEmpty" style="display:none;color:var(--color-faint);font-size:var(--text-sm);text-align:center;padding:var(--space-xl)">No tools match.</p>
+      </section>
+
+      <!-- ---------- REPOS / LEADS ---------- -->
+      <section class="section" data-sec="repos">
+        <div class="sec-head">
+          <h1>Repos / Leads</h1>
+          <p>Each repo is a lead with its own persistent pi session. The registry lives in <code style="font-family:var(--font-mono)">projects.json</code> — an entry is <code style="font-family:var(--font-mono)">{ id, name, dir }</code> where <code style="font-family:var(--font-mono)">id</code> equals the absolute dir. A green dot means the lead is working.</p>
+        </div>
+
+        <div class="tool-toolbar">
+          <div class="tool-search" style="flex:1"><input class="field-input mono" id="repoDir" placeholder="~/Dev/my-app" autocomplete="off" spellcheck="false" style="padding-left:var(--space-md)" /></div>
+          <input class="field-input" id="repoName" placeholder="Display name — optional" autocomplete="off" style="max-width:220px" />
+          <button class="btn primary" id="addRepoBtn" type="button">＋ Add repo</button>
+        </div>
+
+        <div class="block" id="leadList"></div>
+      </section>
+
+      <!-- ---------- PREFERENCES ---------- -->
+      <section class="section" data-sec="prefs">
+        <div class="sec-head">
+          <h1>Preferences</h1>
+          <p>Local to this browser — stored in <code style="font-family:var(--font-mono)">localStorage</code>, not on the harness.</p>
+        </div>
+        <div class="card pad-lg" style="max-width:520px;display:flex;flex-direction:column;gap:var(--space-lg)">
+          <label class="switch-row">
+            <span>Enter to send<small>Off → Enter makes a newline; ⌘/Ctrl+Enter sends</small></span>
+            <input type="checkbox" class="switch" id="prefEnter" checked />
+          </label>
+          <div style="border-top:1px solid var(--color-line-soft)"></div>
+          <label class="switch-row">
+            <span>Reduce motion<small>Minimise animations across the app</small></span>
+            <input type="checkbox" class="switch" id="prefMotion" />
+          </label>
+        </div>
+      </section>
+
+      <!-- ---------- ENVIRONMENT ---------- -->
+      <section class="section" data-sec="env">
+        <div class="sec-head">
+          <h1>Environment</h1>
+          <p>Read-only. These env vars are the <b>defaults</b> — once you change anything in the UI, <code style="font-family:var(--font-mono)">settings.json</code> overrides them.</p>
+        </div>
+
+        <div class="pending" id="envNote" style="border-color:var(--color-line);background:var(--color-bg)">
+          <span class="pico" style="color:var(--color-dim)">⌗</span>
+          <span><b>settings.json overrides these.</b> <small>Model, provider, and thinking are seeded from env on first run, then owned by the harness once edited.</small></span>
+        </div>
+
+        <div class="cols2">
+          <div class="block">
+            <h3 class="block-title">Runtime defaults</h3>
+            <div class="card">
+              <div class="kv"><span class="kk">PROJECT_DIR<small>seed repo for a fresh projects.json</small></span><code>/Users/cole/Dev/vgc-engine</code></div>
+              <div class="kv"><span class="kk">PI_MODEL<small>seeds settings.json</small></span><code>gpt-5.6-sol</code></div>
+              <div class="kv"><span class="kk">PI_PROVIDER</span><code>openai-codex</code></div>
+              <div class="kv"><span class="kk">PI_THINKING</span><code>medium</code></div>
+            </div>
+          </div>
+          <div class="block">
+            <h3 class="block-title">Network</h3>
+            <div class="card">
+              <div class="kv"><span class="kk">PORT<small>web app (frontend)</small></span><code>5178</code></div>
+              <div class="kv"><span class="kk">HARNESS_PORT<small>API + event WS</small></span><code>5179</code></div>
+              <div class="kv"><span class="kk">HARNESS_URL<small>where the web app reaches the harness</small></span><code>http://localhost:5179</code></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ===================== LIVE RAIL ===================== -->
+    <aside class="live" id="live">
+      <div class="live-head">
+        <span class="live-dot"></span>
+        <h2>Activity</h2>
+        <span class="tag" id="liveScope">all leads</span>
+      </div>
+      <div class="live-chips" id="liveChips"></div>
+      <div class="feed" id="feed"></div>
+      <div class="live-foot"><span class="conn-dot on"></span> streaming · <span id="feedCount">0</span> events</div>
+    </aside>
+  </div>
+
+<script type="module">
+  /* ============================================================
+     LIVE DATA — loaded from the harness control API (same-origin)
+     ============================================================ */
+  const esc = (s) => String(s ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const jget = async (u) => { const r = await fetch(u); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); };
+  async function jpost(u, body) {
+    const r = await fetch(u, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    return d;
+  }
+  // a tool step is an "agent" step when it delegates to a sub-agent
+  const isAgentTool = (n) => /subagent|agent|spawn|delegate|^task$/i.test(n || "");
+
+  // Module top-level await: the rest of the module runs once these resolve.
+  let CONFIG, PROJECTS, MANIFEST, SUB_ALLOW, SUB_DENY, SUB_PROMPT, TOOLS;
+  let SUB_RUNS = [];            // live sub-agent runs, newest last (rendered reversed)
+  let pendModel, pendThinking;  // latest UI selections (may be ahead of running leads)
+  let loadOK = true;
+
+  const newLeadState = (p) => ({ ...p, busy: false, lastAt: 0, steps: 0, agents: 0, tokens: 0, subs: [] });
+
+  try {
+    const [, cfg, projs] = await Promise.all([ jget("/health"), jget("/config"), jget("/projects") ]);
+    CONFIG = cfg;
+    PROJECTS = (projs || []).map(newLeadState);
+    const firstId = PROJECTS[0]?.id;
+    MANIFEST = firstId ? await jget("/manifest?project=" + encodeURIComponent(firstId)) : {};
+  } catch (err) {
+    loadOK = false;
+    console.warn("harness load failed:", err);
+    CONFIG = { provider: "—", model: "—", thinking: "—", thinkingLevels: [], models: [], subagent: { enabled: false, model: "—", thinking: "—" }, subagentTools: [] };
+    PROJECTS = [];
+    MANIFEST = {};
+  }
+
+  pendModel = CONFIG.model; pendThinking = CONFIG.thinking;
+
+  // derive tool + sub-agent view data from config + manifest
+  const subTools = CONFIG.subagentTools || MANIFEST.subagentTools || [];
+  const leadToolNames = MANIFEST.toolNames || CONFIG.tools || [];
+  SUB_ALLOW = subTools.slice();
+  SUB_DENY  = leadToolNames.filter(n => !subTools.includes(n));
+  SUB_PROMPT = MANIFEST.subagentSystemPrompt || "(none)";
+  TOOLS = (MANIFEST.tools || []).map(t => ({ ...t, sub: subTools.includes(t.name) }));
+
+  /* ============================================================
+     NAV SWITCHING
+     ============================================================ */
+  const secs = [...document.querySelectorAll(".section")];
+  const navItems = [...document.querySelectorAll(".nav-item")];
+  function showSec(name) {
+    secs.forEach(s => s.classList.toggle("active", s.dataset.sec === name));
+    navItems.forEach(n => n.classList.toggle("active", n.dataset.sec === name));
+    document.getElementById("main").scrollTo?.({ top: 0 });
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+  navItems.forEach(n => n.addEventListener("click", () => showSec(n.dataset.sec)));
+
+  /* ============================================================
+     OVERVIEW + REPOS: per-lead rows, stats, health
+     ============================================================ */
+  const stateFor = (id) => PROJECTS.find(p => p.id === id);
+  const topLeadsEl = document.getElementById("topLeads");
+  const navRepoBadge = document.getElementById("navRepoBadge");
+  const ovLeads = document.getElementById("ovLeads");
+  const leadList = document.getElementById("leadList");
+  const statGrid = document.getElementById("statGrid");
+  const healthCard = document.getElementById("healthCard");
+  let wsConnected = false;
+
+  const fmtTok = (n) => n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n);
+  const fmtAgo = (ts) => {
+    if (!ts) return "idle";
+    const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    return s < 5 ? "just now" : s < 60 ? s + "s ago" : s < 3600 ? Math.floor(s / 60) + "m ago" : Math.floor(s / 3600) + "h ago";
+  };
+
+  function renderStatGrid() {
+    const busy = PROJECTS.filter(p => p.busy).length;
+    const builtin = TOOLS.filter(t => t.source === "builtin").length;
+    const custom = TOOLS.length - builtin;
+    const running = SUB_RUNS.filter(r => r.status === "running").length;
+    const ok = SUB_RUNS.filter(r => r.status === "done").length;
+    const fail = SUB_RUNS.filter(r => r.status === "error").length;
+    const tokens = PROJECTS.reduce((a, p) => a + (p.tokens || 0), 0);
+    statGrid.innerHTML =
+      `<div class="stat"><span class="k">Active leads</span><span class="v accent">${busy} <span class="u">/ ${PROJECTS.length}</span></span><span class="foot">working right now</span></div>` +
+      `<div class="stat"><span class="k">Model</span><span class="v" style="font-size:var(--text-lg)">${esc(CONFIG.model)}</span><span class="foot">thinking · ${esc(CONFIG.thinking)}</span></div>` +
+      `<div class="stat"><span class="k">Tools</span><span class="v">${TOOLS.length} <span class="u">defs</span></span><span class="foot">${builtin} builtin · ${custom} custom</span></div>` +
+      `<div class="stat"><span class="k">Sub-agent runs</span><span class="v">${SUB_RUNS.length} <span class="u">session</span></span><span class="foot">${running} running · ${ok} ok · ${fail} fail</span></div>` +
+      `<div class="stat"><span class="k">Tokens</span><span class="v">${fmtTok(tokens)}</span><span class="foot">session total</span></div>`;
+  }
+
+  function renderHealth() {
+    healthCard.innerHTML =
+      `<div class="hrow"><span class="light ${loadOK ? "ok" : "err"}"></span><span class="hlabel">Harness service<small>HTTP + event WS</small></span><span class="hval">${loadOK ? "ok" : "unreachable"}</span></div>` +
+      `<div class="hrow"><span class="light ${wsConnected ? "ok" : "err"}"></span><span class="hlabel">Browser connection<small>WebSocket event stream</small></span><span class="hval">${wsConnected ? "connected" : "disconnected"}</span></div>` +
+      `<div class="hrow"><span class="light ${loadOK ? "ok" : "warn"}"></span><span class="hlabel">Provider<small>${esc(CONFIG.provider)}</small></span><span class="hval">${esc(CONFIG.model)}</span></div>` +
+      `<div class="hrow"><span class="light ok"></span><span class="hlabel">Web app<small>serves public/ · proxies control API</small></span><span class="hval">:${location.port || (location.protocol === "https:" ? "443" : "80")}</span></div>`;
+  }
+
+  function renderOvLeads() {
+    ovLeads.innerHTML = PROJECTS.length ? PROJECTS.map(p =>
+      `<div class="hrow"><span class="light ${p.busy ? "ok" : ""}"></span>` +
+      `<span class="hlabel">${esc(p.name)}<small>${esc(p.dir)}</small></span>` +
+      `<span class="hval">${p.busy ? "working" : "idle" + (p.lastAt ? " · " + esc(fmtAgo(p.lastAt)) : "")}</span></div>`
+    ).join("") : `<p style="margin:0;color:var(--color-faint);font-size:var(--text-sm)">No leads registered.</p>`;
+  }
+
+  function renderLeads() {
+    leadList.innerHTML = PROJECTS.length ? PROJECTS.map(p =>
+      `<div class="lead-row">` +
+        `<span class="lead-dot ${p.busy ? "busy" : ""}"></span>` +
+        `<span class="lead-name">${esc(p.name)}</span>` +
+        `<span class="lead-dir">${esc(p.dir)}</span>` +
+        `<span class="lead-act">${p.busy ? "● working" : esc(fmtAgo(p.lastAt))}</span>` +
+        `<button class="btn danger sm" type="button" disabled title="Repo removal isn't supported by the harness yet">Remove</button>` +
+      `</div>`
+    ).join("") : `<p style="color:var(--color-faint);font-size:var(--text-sm)">No repos registered — add one above.</p>`;
+  }
+
+  function renderLeadViews() {
+    topLeadsEl.textContent = PROJECTS.length;
+    navRepoBadge.textContent = PROJECTS.length;
+    renderStatGrid(); renderHealth(); renderOvLeads(); renderLeads();
+  }
+  renderLeadViews();
+
+  // Add repo → POST /projects, then refresh the list from the returned registry.
+  const addRepoBtn = document.getElementById("addRepoBtn");
+  const repoDirEl = document.getElementById("repoDir");
+  const repoNameEl = document.getElementById("repoName");
+  addRepoBtn.addEventListener("click", async () => {
+    const dir = repoDirEl.value.trim();
+    if (!dir) { repoDirEl.focus(); return; }
+    const label = addRepoBtn.textContent;
+    addRepoBtn.disabled = true; addRepoBtn.textContent = "Adding…";
+    try {
+      const data = await jpost("/projects", { dir, name: repoNameEl.value.trim() });
+      PROJECTS = (data.list || []).map(p => {
+        const prev = stateFor(p.id);
+        return prev ? { ...prev, ...p } : newLeadState(p);
+      });
+      repoDirEl.value = ""; repoNameEl.value = "";
+      renderLeadViews(); renderLeadEffect();
+    } catch (err) {
+      alert("Couldn't add repo: " + (err.message || err));
+    } finally {
+      addRepoBtn.disabled = false; addRepoBtn.textContent = label;
+    }
+  });
+
+  /* ============================================================
+     MODEL & REASONING
+     ============================================================ */
+  const cfgModel = document.getElementById("cfgModel");
+  cfgModel.innerHTML = (CONFIG.models || []).map(m =>
+    `<option value="${esc(m.id)}" ${m.id === CONFIG.model ? "selected" : ""}>${esc(m.name || m.id)} (${esc(m.provider || CONFIG.provider)})</option>`
+  ).join("");
+
+  const pending = document.getElementById("modelPending");
+  const pendingPico = pending.querySelector(".pico");
+  const pendingText = document.getElementById("modelPendingText");
+  const leadEffect = document.getElementById("modelLeadEffect");
+
+  function renderLeadEffect() {
+    leadEffect.innerHTML = PROJECTS.length ? PROJECTS.map(p => {
+      const changed = pendModel !== CONFIG.model || pendThinking !== CONFIG.thinking;
+      const st = p.busy
+        ? `<span class="st-badge running">in-flight · old settings</span>`
+        : changed ? `<span class="st-badge running">respawns next msg</span>`
+                  : `<span class="st-badge done">up to date</span>`;
+      return `<div class="hrow"><span class="light ${p.busy ? "ok" : ""}"></span>` +
+        `<span class="hlabel">${esc(p.name)}<small>${p.busy ? "finishes current reply on " + esc(CONFIG.model) + ", then drops" : "cached — respawns on next message"}</small></span>` +
+        `<span class="hval">${st}</span></div>`;
+    }).join("") : `<p style="margin:0;color:var(--color-faint);font-size:var(--text-sm)">No leads registered.</p>`;
+  }
+  function markPending() {
+    pending.style.borderColor = ""; pendingPico.textContent = "◷";
+    const changed = pendModel !== CONFIG.model || pendThinking !== CONFIG.thinking;
+    pending.hidden = !changed;
+    if (changed) {
+      const bits = [];
+      if (pendModel !== CONFIG.model) bits.push(`model → ${esc(pendModel)}`);
+      if (pendThinking !== CONFIG.thinking) bits.push(`thinking → ${esc(pendThinking)}`);
+      pendingText.innerHTML = `<b>Saved · ${bits.join(" · ")}.</b> Applies on each lead's next message — cached leads respawn with the new setting; any in-flight reply finishes on the old one.`;
+    }
+    renderLeadEffect();
+  }
+  function showConfigError(msg) {
+    pending.hidden = false;
+    pending.style.borderColor = "var(--color-danger)";
+    pendingPico.textContent = "⚠";
+    pendingText.innerHTML = `<b>Save failed.</b> ${esc(msg)}`;
+  }
+
+  cfgModel.addEventListener("change", async () => {
+    pendModel = cfgModel.value;
+    const m = (CONFIG.models || []).find(x => x.id === pendModel);
+    markPending();
+    try { await jpost("/config", { provider: m?.provider || CONFIG.provider, model: pendModel }); }
+    catch (err) { showConfigError(err.message || String(err)); }
+  });
+
+  // thinking segmented control (shared builder)
+  function buildSeg(el, levels, current, onPick) {
+    el.innerHTML = (levels || []).map(l => `<button type="button" data-l="${esc(l)}" class="${l === current ? "on" : ""}">${esc(l)}</button>`).join("");
+    el.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      el.querySelectorAll("button").forEach(x => x.classList.remove("on"));
+      b.classList.add("on");
+      onPick(b.dataset.l);
+    }));
+  }
+  buildSeg(document.getElementById("thinkSeg"), CONFIG.thinkingLevels, CONFIG.thinking, async (l) => {
+    pendThinking = l; markPending();
+    try { await jpost("/config", { thinking: l }); }
+    catch (err) { showConfigError(err.message || String(err)); }
+  });
+  renderLeadEffect();
+
+  /* ============================================================
+     SUB-AGENTS
+     ============================================================ */
+  const SUBCFG = CONFIG.subagent || { enabled: false, model: "", thinking: "medium" };
+  document.getElementById("subToolChips").innerHTML = SUB_ALLOW.map(t =>
+    `<span class="chip accent"><span>${esc(t)}</span></span>`).join("");
+  document.getElementById("subDenyChips").innerHTML = SUB_DENY.map(t =>
+    `<span class="chip"><span style="color:var(--color-faint);text-decoration:line-through">${esc(t)}</span></span>`).join("");
+  document.getElementById("subPrompt").textContent = SUB_PROMPT;
+
+  // Sub-agent config writes → POST /config { subagent: {...} }
+  const subEnabled = document.getElementById("subEnabled");
+  const subModel = document.getElementById("subModel");
+  subEnabled.checked = !!SUBCFG.enabled;
+  subModel.innerHTML = (CONFIG.models || []).map(m =>
+    `<option value="${esc(m.id)}" ${m.id === SUBCFG.model ? "selected" : ""}>${esc(m.name || m.id)} (${esc(m.provider || CONFIG.provider)})</option>`).join("");
+  async function saveSub(patch) {
+    try { await jpost("/config", { subagent: patch }); }
+    catch (err) { alert("Sub-agent save failed: " + (err.message || err)); }
+  }
+  subEnabled.addEventListener("change", () => saveSub({ enabled: subEnabled.checked }));
+  subModel.addEventListener("change", () => saveSub({ model: subModel.value }));
+  buildSeg(document.getElementById("subThinkSeg"), CONFIG.thinkingLevels, SUBCFG.thinking, (l) => saveSub({ thinking: l }));
+
+  const navSubBadge = document.getElementById("navSubBadge");
+  const subRunsEl = document.getElementById("subRuns");
+  function renderSubRuns() {
+    navSubBadge.textContent = SUB_RUNS.length;
+    const runs = SUB_RUNS.slice().reverse();
+    subRunsEl.innerHTML = runs.length ? runs.map(r =>
+      `<div class="sub ${r.status}"><div class="sub-top">` +
+        `<span class="sub-dot"></span>` +
+        `<span class="sub-task">${esc(r.task || "(investigation)")}</span>` +
+        `<span class="sub-meta">` +
+          `<span class="chip"><b>model</b><span>${esc(r.model)}</span></span>` +
+          `<span class="st-badge ${r.status}">${r.status === "done" ? "ok" : r.status}</span>` +
+          `<span class="sub-t">${esc(fmtAgo(r.at))}</span>` +
+        `</span></div>` +
+        (r.result ? `<div class="sub-res"><span class="rk">result</span> &nbsp;${esc(r.result)}</div>` : "") +
+      `</div>`
+    ).join("") : `<p style="margin:0;color:var(--color-faint);font-size:var(--text-sm)">No sub-agent runs yet — leads delegate here when a dig is heavy.</p>`;
+  }
+  renderSubRuns();
+
+  /* ============================================================
+     TOOLS INSPECTOR
+     ============================================================ */
+  document.getElementById("navToolBadge").textContent = TOOLS.length;
+  const toolList = document.getElementById("toolList");
+  const toolCount = document.getElementById("toolCount");
+  const toolEmpty = document.getElementById("toolEmpty");
+  let toolQuery = "", toolF = "all";
+
+  const schemaType = (v) => v?.type || (Array.isArray(v?.anyOf) ? v.anyOf.map(x => x.type).filter(Boolean).join("|") : "") || "any";
+
+  function highlightJSON(obj) {
+    const json = JSON.stringify(obj, null, 2);
+    return esc(json)
+      .replace(/&quot;([^&]+?)&quot;(\s*:)/g, '<span class="k">&quot;$1&quot;</span>$2')
+      .replace(/: (&quot;[^&]*?&quot;)/g, ': <span class="s">$1</span>')
+      .replace(/: (true|false|-?\d+\.?\d*)/g, ': <span class="n">$1</span>');
+  }
+
+  function toolCard(t) {
+    const props = t.schema && t.schema.properties ? Object.entries(t.schema.properties) : [];
+    const req = new Set(t.schema?.required || []);
+    const paramLine = props.length
+      ? props.map(([k, v]) => `<span class="chip"><b>${esc(k)}${req.has(k) ? "" : "?"}</b><span class="prm-t" style="color:var(--color-accent-dim);font-size:10px">${esc(schemaType(v))}</span></span>`).join("")
+      : `<span style="color:var(--color-faint);font-size:var(--text-xs);font-style:italic">no parameters</span>`;
+    const guides = (t.guidelines || []).length
+      ? `<div><p class="tsub-h">Guidelines</p><ul class="guide-list">${t.guidelines.map(g => `<li>${esc(g)}</li>`).join("")}</ul></div>`
+      : "";
+    return `<details class="tool"><summary>` +
+        `<code class="tname">${esc(t.name)}</code>` +
+        `<span class="tsum-desc">${esc(t.description)}</span>` +
+        `<span class="tsum-badges">` +
+          `<span class="tag ${t.source === "custom" ? "custom" : ""}">${esc(t.source)}</span>` +
+          (t.sub ? `<span class="avail sub">sub-agent</span>` : `<span class="avail lead">lead</span>`) +
+        `</span>` +
+      `</summary><div class="tbody">` +
+        `<p class="tdesc">${esc(t.description)}</p>` +
+        `<div><p class="tsub-h">Parameters</p><div class="chips">${paramLine}</div></div>` +
+        guides +
+        `<div><button class="schema-toggle" type="button">▸ JSON schema</button>` +
+          `<pre class="schema" hidden>${highlightJSON(t.schema)}</pre></div>` +
+      `</div></details>`;
+  }
+
+  function renderTools() {
+    const q = toolQuery.toLowerCase();
+    const list = TOOLS.filter(t => {
+      if (toolF === "builtin" && t.source !== "builtin") return false;
+      if (toolF === "custom" && t.source !== "custom") return false;
+      if (toolF === "sub" && !t.sub) return false;
+      if (!q) return true;
+      const hay = (t.name + " " + t.description + " " + (t.guidelines || []).join(" ")).toLowerCase();
+      return hay.includes(q);
+    });
+    toolList.innerHTML = list.map(toolCard).join("");
+    toolCount.textContent = `· ${list.length} of ${TOOLS.length}`;
+    toolEmpty.style.display = list.length ? "none" : "block";
+    toolList.querySelectorAll(".schema-toggle").forEach(btn => btn.addEventListener("click", () => {
+      const pre = btn.nextElementSibling;
+      const open = pre.hidden;
+      pre.hidden = !open;
+      btn.textContent = (open ? "▾" : "▸") + " JSON schema";
+    }));
+  }
+  document.getElementById("toolSearch").addEventListener("input", (e) => { toolQuery = e.target.value; renderTools(); });
+  document.getElementById("toolFilter").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    document.getElementById("toolFilter").querySelectorAll("button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on"); toolF = b.dataset.f; renderTools();
+  }));
+  renderTools();
+
+  /* ============================================================
+     PREFERENCES
+     ============================================================ */
+  const prefEnter = document.getElementById("prefEnter");
+  const prefMotion = document.getElementById("prefMotion");
+  prefEnter.checked = localStorage.getItem("pi-lead.enterToSend") !== "0";
+  prefMotion.checked = localStorage.getItem("pi-lead.reduceMotion") === "1";
+  document.documentElement.toggleAttribute("data-reduce-motion", prefMotion.checked);
+  prefEnter.addEventListener("change", () => localStorage.setItem("pi-lead.enterToSend", prefEnter.checked ? "1" : "0"));
+  prefMotion.addEventListener("change", () => {
+    localStorage.setItem("pi-lead.reduceMotion", prefMotion.checked ? "1" : "0");
+    document.documentElement.toggleAttribute("data-reduce-motion", prefMotion.checked);
+  });
+
+  /* ============================================================
+     LIVE ACTIVITY FEED — real event stream over WebSocket
+     ============================================================ */
+  const feed = document.getElementById("feed");
+  const feedCountEl = document.getElementById("feedCount");
+  const liveChips = document.getElementById("liveChips");
+  const connDot = document.getElementById("connDot");
+  const nameFor = (id) => stateFor(id)?.name || (id ? String(id).split("/").pop() : "?");
+  let feedCount = 0;
+
+  function renderChips() {
+    const steps = PROJECTS.reduce((a, p) => a + (p.steps || 0), 0);
+    const agents = PROJECTS.reduce((a, p) => a + (p.agents || 0), 0);
+    const tokens = PROJECTS.reduce((a, p) => a + (p.tokens || 0), 0);
+    liveChips.innerHTML =
+      `<span class="chip accent"><b>steps</b><span>${steps}</span></span>` +
+      `<span class="chip accent"><b>agents</b><span>${agents}</span></span>` +
+      `<span class="chip"><b>runs</b><span>${SUB_RUNS.length}</span></span>` +
+      `<span class="chip"><b>tok</b><span>${fmtTok(tokens)}</span></span>`;
+  }
+  renderChips();
+
+  const clk = () => { const d = new Date(); return String(d.getMinutes()).padStart(2, "0") + ":" + String(d.getSeconds()).padStart(2, "0"); };
+  function pushEvent(kind, projId, body) {
+    const row = document.createElement("div");
+    row.className = "ev " + kind;
+    const label = `<b style="color:var(--color-faint);font-weight:500">${esc(nameFor(projId))}</b> &nbsp;`;
+    row.innerHTML = `<span class="et">${clk()}</span><span class="ek">${kind}</span><span class="em">${label}${body}</span>`;
+    feed.appendChild(row);
+    while (feed.children.length > 120) feed.removeChild(feed.firstChild);
+    feed.scrollTop = feed.scrollHeight;
+    feedCount++; feedCountEl.textContent = feedCount;
+  }
+
+  function setConn(on) {
+    wsConnected = on;
+    connDot.classList.toggle("on", on);
+    document.querySelectorAll(".live-foot .conn-dot").forEach(d => d.classList.toggle("on", on));
+    renderHealth();
+  }
+  setConn(false);
+
+  // Refresh the project registry (e.g. on hello / add), preserving live counters.
+  function syncProjects(list) {
+    if (!Array.isArray(list)) return;
+    PROJECTS = list.map(p => { const prev = stateFor(p.id); return prev ? { ...prev, ...p } : newLeadState(p); });
+    renderLeadViews(); renderLeadEffect();
+  }
+
+  let ws = null;
+  function connect() {
+    ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`);
+    ws.onopen = () => setConn(true);
+    ws.onclose = () => { setConn(false); setTimeout(connect, 1000); };
+    ws.onerror = () => { try { ws.close(); } catch {} };
+    ws.onmessage = (e) => {
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.type === "hello") { syncProjects(m.projects); return; }
+      const st = m.project ? stateFor(m.project) : null;
+      switch (m.type) {
+        case "typing":
+          if (st) { st.busy = true; st.lastAt = Date.now(); }
+          pushEvent("typing", m.project, "lead thinking");
+          break;
+        case "step": {
+          const agent = isAgentTool(m.tool);
+          if (st) { if (agent) st.agents++; else st.steps++; st.lastAt = Date.now(); }
+          pushEvent("step", m.project, `<code>${esc(m.tool || "?")}</code>`);
+          break;
+        }
+        case "usage":
+          if (st) { st.tokens += (m.input || 0) + (m.output || 0); st.lastAt = Date.now(); }
+          pushEvent("usage", m.project, `in ${fmtTok(m.input || 0)} · out ${fmtTok(m.output || 0)}`);
+          break;
+        case "subagent":
+          if (m.phase === "start") {
+            SUB_RUNS.push({ id: m.id, project: m.project, task: m.task || "", status: "running", result: "", model: m.model || SUBCFG.model || CONFIG.model, at: Date.now() });
+            if (SUB_RUNS.length > 40) SUB_RUNS.shift();
+            pushEvent("subagent", m.project, `start · ${esc(m.task || "investigation")}`);
+          } else {
+            const r = SUB_RUNS.find(x => x.id === m.id);
+            if (r) { r.status = m.ok ? "done" : "error"; r.result = m.result || ""; if (m.model) r.model = m.model; }
+            pushEvent("subagent", m.project, `end · ${m.ok ? "ok" : "fail"}${m.result ? " · " + esc(String(m.result).slice(0, 80)) : ""}`);
+          }
+          renderSubRuns();
+          break;
+        case "delta":
+          if (m.text) pushEvent("delta", m.project, esc(m.text));
+          if (st) st.lastAt = Date.now();
+          break;
+        case "done":
+          if (st) { st.busy = false; st.lastAt = Date.now(); }
+          pushEvent("done", m.project, `done · ${st ? st.steps : 0} steps · ${st ? st.agents : 0} agents · ${fmtTok(st ? st.tokens : 0)} tok`);
+          break;
+        case "error":
+          if (st) { st.busy = false; st.lastAt = Date.now(); }
+          pushEvent("error", m.project, esc(m.text || "error"));
+          break;
+        default:
+          return;
+      }
+      renderStatGrid(); renderOvLeads(); renderLeads(); renderLeadEffect(); renderChips();
+    };
+  }
+  connect();
+
+  /* ============================================================
+     RESPONSIVE — live rail toggle
+     ============================================================ */
+  const live = document.getElementById("live");
+  document.getElementById("liveToggle").addEventListener("click", () => live.classList.toggle("show"));
+</script>
+</body>
+</html>

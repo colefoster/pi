@@ -1,0 +1,27 @@
+{
+  "name": "@pi/tui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Terminal client for the pi harness — a peer to pi-web. Chat with the lead, switch repos, watch streaming output, tweak model/thinking, all from the terminal.",
+  "bin": {
+    "pi-tui": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "dependencies": {
+    "htm": "^3.1.1",
+    "ink": "^5.1.0",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^18.3.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "ink-testing-library": "^4.0.0"
+  }
+}

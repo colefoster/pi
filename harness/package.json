@@ -1,0 +1,20 @@
+{
+  "name": "@pi/harness",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "pi harness — orchestration core + HTTP/WS service on :5179. Single engine behind the web and tui clients.",
+  "scripts": {
+    "dev": "node service.mjs",
+    "start": "node service.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.81.1",
+    "@earendil-works/pi-coding-agent": "0.81.1",
+    "ws": "^8.21.1"
+  }
+}
