@@ -28,7 +28,7 @@ Who supplies the token:
 ## Project root allowlist
 
 Set **`PI_PROJECT_ROOT`** to restrict `addProject` to directories under that
-root, so the control API can't point a lead at `~/.ssh` or `/`. Unset = no
+root, so the control API can't point an agent at `~/.ssh` or `/`. Unset = no
 restriction (any existing directory).
 
 ## Backpressure
@@ -41,6 +41,6 @@ does the same for browser sockets (`WEB_WS_MAX_BUFFER`).
 
 The next security step (not yet implemented) is a **per-project sandbox** — run
 each project's tool execution inside a container/jail so a compromised or
-mis-instructed lead can't touch the host beyond its project dir. The shared
+mis-instructed agent can't touch the host beyond its project dir. The shared
 secret gates *who* can drive the agent; the sandbox would limit *what* a driven
 agent can do. Tracked as a follow-up.

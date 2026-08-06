@@ -1,9 +1,9 @@
 # pi-web
 
-The browser UI for the [**pi-lead**](../pi) harness. A thin edge: it serves the
+The browser UI for the [**pi**](../pi) harness. A thin edge: it serves the
 static frontend (`public/`), proxies the harness control API (`/config`,
-`/projects`, `/manifest`, `/health`), and bridges browser WebSockets to the
-harness event stream. All agent logic lives in the harness — this repo has none.
+`/projects`, `/manifest`, `/messages`, `/health`), and bridges browser WebSockets to the
+harness event stream. All agent logic lives in the harness — this package has none.
 
 ## Run
 
