@@ -1,5 +1,6 @@
-// pi-lead harness — pure orchestration core, no HTTP/WS.
-// One lazily-created pi "lead" session per repo, plus cheap read-only subagents.
+// pi harness — pure orchestration core, no HTTP/WS.
+// One lazily-created agent session per repo. This is a thin 1-ply harness: the
+// editable surface is the system prompt (a file) and the tool set (settings.json).
 // Emits tagged lifecycle events via `events` (EventEmitter, channel "event");
 // the service layer forwards those to the network. Auth: pi's ChatGPT/Codex subscription.
 
@@ -9,18 +10,17 @@ import { dirname, join, basename, resolve } from "node:path";
 import { homedir } from "node:os";
 import { EventEmitter } from "node:events";
 import { msg, validateOutbound } from "@pi/protocol";
-import { createLeadCache } from "./leadCache.mjs";
+import { createAgentCache } from "./agentCache.mjs";
 import {
   createAgentSession,
   ModelRuntime,
   SessionManager,
   DefaultResourceLoader,
   getAgentDir,
-  defineTool,
 } from "@earendil-works/pi-coding-agent";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, ".."); // repo root — where projects.json / settings.json live
+const ROOT = join(__dirname, ".."); // repo root — projects.json / settings.json / system-prompt.md live here
 
 // ---- config -------------------------------------------------------------
 const PROVIDER = process.env.PI_PROVIDER || "openai-codex";
@@ -28,41 +28,47 @@ const MODEL_ID = process.env.PI_MODEL || "gpt-5.6-sol";
 const AGENT_DIR = getAgentDir();
 const PROJECTS_FILE = join(ROOT, "projects.json");
 const SETTINGS_FILE = join(ROOT, "settings.json");
+const PROMPT_FILE = join(ROOT, "system-prompt.md"); // default prompt for every repo
+const PROJECT_PROMPT = ".pi-prompt.md"; // per-repo override, read from the project dir
 const DEFAULT_DIR = process.env.PROJECT_DIR || "/Users/cole/Dev/vgc-engine";
-const TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
-// Sub-agent: a cheaper, read-only worker the lead can delegate heavy digs to.
-const SUBAGENT_TOOLS = ["read", "grep", "find", "ls"];
-const SUBAGENT_MODEL = process.env.PI_SUBAGENT_MODEL || "gpt-5.4-mini";
+// The full tool menu an agent can be given. settings.tools picks from this set;
+// the config UI offers exactly these as choices.
+const ALL_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
+const DEFAULT_TOOLS = [...ALL_TOOLS];
 const THINKING = process.env.PI_THINKING || "medium";
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 
-const leadPrompt = (dir, subEnabled = true) => `You are "lead", a senior dev teammate messaging Cole over IM.
+// Built-in fallback, used only when neither system-prompt.md nor a per-project
+// .pi-prompt.md exists. Kept deliberately minimal — the prompt is meant to be
+// edited in the file, not here.
+const FALLBACK_PROMPT = `You are a coding agent with full access to the project at {dir}.
+Use your tools to inspect the actual code or state before answering — never guess.
+Be concise and lead with the answer.`;
 
-You have tools (${TOOLS.join(", ")}) and full access to the project at ${dir}.${subEnabled ? `
-You also have a "subagent" tool: delegate a self-contained, read-only investigation to a
-cheaper worker when a question needs a heavy multi-file dig. It returns findings with
-file:line refs; you summarize. Use it to keep your own context lean — but for quick lookups,
-just use your own tools directly.` : ""}
-ALWAYS check the code/state before answering — never guess.
-
-How you communicate (this is the important part):
-- Reply like a text message: 1-3 short sentences. Lead with the answer.
-- No walls of text, no headers, no bullet dumps unless Cole explicitly asks to expand.
-- Surface at most ONE decision or question per message.
-- If you found or did a lot, give the one-line upshot and offer to expand ("want the details?") instead of dumping it.
-- Do the heavy thinking and work silently via tools; only the conclusion reaches Cole.
-- Plain language, low ceremony. It's fine to be direct.`;
-
-const subagentPrompt = (dir) => `You are a focused sub-agent running ONE delegated investigation for the lead dev, inside the project at ${dir}.
-Use your read-only tools (${SUBAGENT_TOOLS.join(", ")}) to actually inspect the code — never guess.
-You cannot ask follow-up questions: the lead can't reply. Do the work, then return a tight,
-self-contained answer — the concrete findings with file:line references, no preamble.`;
-
-// ---- projects registry (projects.json is the source of truth) -----------
-// shape: [{ id, name, dir }]   id === absolute dir (unique)
 function expandHome(p) {
   return p.startsWith("~") ? join(homedir(), p.slice(1)) : p;
 }
+
+// The system prompt is a file, so editing it — not code — changes agent behavior.
+// Precedence: per-project .pi-prompt.md > root system-prompt.md > built-in
+// fallback. Read fresh on every spawn, so an edit takes effect on the next agent
+// (a settings change respawns every agent; otherwise it applies to the next new
+// one). {dir} and {tools} are interpolated.
+function loadPromptTemplate(projectDir) {
+  const override = join(projectDir, PROJECT_PROMPT);
+  try { if (existsSync(override)) return readFileSync(override, "utf8"); } catch {}
+  try { if (existsSync(PROMPT_FILE)) return readFileSync(PROMPT_FILE, "utf8"); } catch {}
+  return FALLBACK_PROMPT;
+}
+function renderPrompt(projectDir, tools) {
+  return loadPromptTemplate(projectDir)
+    .replaceAll("{dir}", projectDir)
+    .replaceAll("{tools}", tools.join(", "))
+    .trim();
+}
+
+// ---- projects registry (projects.json is the source of truth) -----------
+// shape: [{ id, name, dir }]   id === absolute dir (unique)
 function loadProjects() {
   if (!existsSync(PROJECTS_FILE)) {
     const seed = [{ id: DEFAULT_DIR, name: basename(DEFAULT_DIR), dir: DEFAULT_DIR }];
@@ -79,7 +85,7 @@ function saveProjects(list) {
   writeFileSync(PROJECTS_FILE, JSON.stringify(list, null, 2));
 }
 // Optional allowlist root: when PI_PROJECT_ROOT is set, only directories under
-// it can be registered, so the control API can't point a lead at ~/.ssh or /.
+// it can be registered, so the control API can't point an agent at ~/.ssh or /.
 const PROJECT_ROOT = process.env.PI_PROJECT_ROOT ? resolve(expandHome(process.env.PI_PROJECT_ROOT)) : "";
 function withinRoot(abs) {
   if (!PROJECT_ROOT) return true;
@@ -102,19 +108,19 @@ function addProject({ name, dir }) {
 }
 
 // ---- harness settings (settings.json overrides env-var defaults) --------
-// shape: { provider, model, thinking } — the live config every new lead uses.
+// shape: { provider, model, thinking, tools } — the live config every new agent uses.
 function loadSettings() {
-  const base = {
-    provider: PROVIDER,
-    model: MODEL_ID,
-    thinking: THINKING,
-    subagent: { enabled: true, model: SUBAGENT_MODEL, thinking: THINKING },
-  };
+  const base = { provider: PROVIDER, model: MODEL_ID, thinking: THINKING, tools: DEFAULT_TOOLS };
   if (!existsSync(SETTINGS_FILE)) return base;
   try {
     const saved = JSON.parse(readFileSync(SETTINGS_FILE, "utf8"));
-    // nested subagent block merges field-wise so old settings.json files upgrade cleanly
-    return { ...base, ...saved, subagent: { ...base.subagent, ...(saved.subagent || {}) } };
+    const tools = Array.isArray(saved.tools) && saved.tools.length ? saved.tools : base.tools;
+    return {
+      provider: saved.provider ?? base.provider,
+      model: saved.model ?? base.model,
+      thinking: saved.thinking ?? base.thinking,
+      tools,
+    };
   } catch {
     return base;
   }
@@ -140,7 +146,7 @@ export async function createHarness() {
 
   const settings = loadSettings();
 
-  // ---- model (shared across leads) --------------------------------------
+  // ---- model (shared across agents) -------------------------------------
   console.log(`[harness] provider/model: ${settings.provider}/${settings.model} · thinking: ${settings.thinking}`);
   const modelRuntime = await ModelRuntime.create();
   try {
@@ -178,8 +184,8 @@ export async function createHarness() {
     }
   }
 
-  // Apply a settings change: validate, swap the shared model, persist, and drop
-  // cached leads so each respawns lazily with the new model/thinking level.
+  // Apply a settings change: validate, swap the shared model / tool set, persist,
+  // and drop cached agents so each respawns lazily with the new config.
   // (In-flight prompts keep their old session reference and finish uninterrupted.)
   function applySettings(next) {
     const provider = (next.provider ?? settings.provider).trim();
@@ -191,43 +197,46 @@ export async function createHarness() {
     const nextModel = modelRuntime.getModel(provider, modelId);
     if (!nextModel) throw new Error(`unknown model: ${provider}/${modelId}`);
 
-    // sub-agent config (nested, all fields optional — merge over current)
-    const sub = { ...settings.subagent, ...(next.subagent || {}) };
-    sub.enabled = !!sub.enabled;
-    sub.model = String(sub.model ?? SUBAGENT_MODEL).trim();
-    sub.thinking = String(sub.thinking ?? thinking).trim();
-    if (!THINKING_LEVELS.includes(sub.thinking))
-      throw new Error(`invalid sub-agent thinking level: ${sub.thinking}`);
-    if (!modelRuntime.getModel(provider, sub.model))
-      throw new Error(`unknown sub-agent model: ${provider}/${sub.model}`);
+    // Tool set — validate against the known menu so a typo can't silently brick
+    // every agent at session-creation time.
+    let tools = settings.tools;
+    if (next.tools !== undefined) {
+      if (!Array.isArray(next.tools) || !next.tools.length)
+        throw new Error("tools must be a non-empty array");
+      const cleaned = next.tools.map((t) => String(t).trim()).filter(Boolean);
+      const unknown = cleaned.filter((t) => !ALL_TOOLS.includes(t));
+      if (unknown.length)
+        throw new Error(`unknown tool(s): ${unknown.join(", ")} (allowed: ${ALL_TOOLS.join(", ")})`);
+      tools = [...new Set(cleaned)];
+    }
 
     model = nextModel;
     settings.provider = provider;
     settings.model = modelId;
     settings.thinking = thinking;
-    settings.subagent = sub;
+    settings.tools = tools;
     saveSettings(settings);
-    // Dispose the old leads (tears down their subscriptions + sessions) before
-    // dropping them, so each respawns lazily with the new model/thinking.
-    leads.disposeAll();
+    // Dispose the old agents (tears down their subscriptions + sessions) before
+    // dropping them, so each respawns lazily with the new model/thinking/tools.
+    agents.disposeAll();
     console.log(
       `[harness] settings updated → ${provider}/${modelId} · thinking: ${thinking} · ` +
-      `sub-agent ${sub.enabled ? sub.model + "/" + sub.thinking : "off"} (leads will respawn)`,
+      `tools: ${tools.join(",")} (agents will respawn)`,
     );
     return settings;
   }
 
-  // ---- leads: one lazily-created pi session per project -----------------
-  const leads = createLeadCache({ dispose: disposeLead });
+  // ---- agents: one lazily-created pi session per project ----------------
+  const agents = createAgentCache({ dispose: disposeAgent });
 
-  // Live tool manifest for the inspector. Tools are identical across leads, so
+  // Live tool manifest for the inspector. Tools are identical across agents, so
   // we capture the resolved definitions (name/description/JSON-schema/source)
-  // from the first lead that spins up — this auto-reflects any customTools too.
+  // from the first agent that spins up.
   let toolManifest = null;
   function captureManifest(session) {
     if (toolManifest) return;
     try {
-      const active = new Set(session.getActiveToolNames?.() ?? TOOLS);
+      const active = new Set(session.getActiveToolNames?.() ?? settings.tools);
       const defs = (session.getAllTools?.() ?? [])
         .filter((t) => active.has(t.name))
         .map((t) => ({
@@ -235,84 +244,19 @@ export async function createHarness() {
           description: t.description ?? "",
           schema: t.parameters ?? null,
           guidelines: t.promptGuidelines ?? [],
-          source: TOOLS.includes(t.name) ? "builtin" : "custom",
+          source: ALL_TOOLS.includes(t.name) ? "builtin" : "custom",
         }));
       if (defs.length) toolManifest = defs;
     } catch (e) {
       console.log("[harness] tool introspection failed:", e?.message ?? e);
     }
   }
-  // Ensure the manifest is populated; lazily spins up the first lead if none exist yet.
+  // Ensure the manifest is populated; lazily spins up the first agent if none exist yet.
   async function ensureManifest() {
     if (toolManifest) return toolManifest;
     const list = loadProjects();
-    if (list.length) { try { await getLead(list[0]); } catch {} }
+    if (list.length) { try { await getAgent(list[0]); } catch {} }
     return toolManifest;
-  }
-
-  // Run one nested, read-only session on the cheap model and return its final text.
-  async function runSubagent(project, task) {
-    const subModel = modelRuntime.getModel(settings.provider, settings.subagent.model) || model;
-    const loader = new DefaultResourceLoader({
-      cwd: project.dir,
-      agentDir: AGENT_DIR,
-      systemPromptOverride: () => subagentPrompt(project.dir),
-    });
-    await loader.reload();
-    const { session } = await createAgentSession({
-      cwd: project.dir,
-      model: subModel,
-      modelRuntime,
-      resourceLoader: loader,
-      // Ephemeral: a delegated dig is one-shot with no follow-ups, so it must
-      // not persist a throwaway session file to the project's session dir.
-      sessionManager: SessionManager.inMemory(project.dir),
-      tools: SUBAGENT_TOOLS,
-      thinkingLevel: settings.subagent.thinking,
-    });
-    try {
-      await session.prompt(task);
-      return session.getLastAssistantText() || "(sub-agent returned nothing)";
-    } finally {
-      session.dispose?.();
-    }
-  }
-
-  // A "subagent" tool bound to one project. The lead calls it to delegate a dig;
-  // we emit start/end events so the inspector's Subagents panel lights up.
-  function makeSubagentTool(project) {
-    return defineTool({
-      name: "subagent",
-      label: "Delegate to sub-agent",
-      description:
-        "Delegate a focused, read-only investigation of this repo to a cheaper sub-agent. " +
-        "Give it a single self-contained task (it cannot ask follow-ups); it returns findings " +
-        "with file:line references. Use for heavy multi-file exploration you don't want cluttering your own context.",
-      parameters: {
-        type: "object",
-        properties: {
-          task: {
-            type: "string",
-            description: "Self-contained instruction: exactly what to find or investigate, with enough context to act alone.",
-          },
-        },
-        required: ["task"],
-      },
-      async execute(toolCallId, params) {
-        const task = String(params?.task || "").trim();
-        if (!task) return { content: [{ type: "text", text: "error: empty task" }], details: {} };
-        emit(msg.subagentStart(project.id, toolCallId, task, settings.subagent.model));
-        try {
-          const text = await runSubagent(project, task);
-          emit(msg.subagentEnd(project.id, toolCallId, true, text));
-          return { content: [{ type: "text", text }], details: { model: settings.subagent.model } };
-        } catch (e) {
-          const errText = e?.message ?? String(e);
-          emit(msg.subagentEnd(project.id, toolCallId, false, errText));
-          return { content: [{ type: "text", text: "sub-agent failed: " + errText }], details: {} };
-        }
-      },
-    });
   }
 
   // Translate raw pi session events into the tagged wire events the UI consumes.
@@ -339,14 +283,14 @@ export async function createHarness() {
     }
   }
 
-  async function createLead(project) {
+  async function createAgent(project) {
+    const tools = settings.tools;
     const loader = new DefaultResourceLoader({
       cwd: project.dir,
       agentDir: AGENT_DIR,
-      systemPromptOverride: () => leadPrompt(project.dir, settings.subagent.enabled),
+      systemPromptOverride: () => renderPrompt(project.dir, tools),
     });
     await loader.reload();
-    const subEnabled = settings.subagent.enabled;
     const { session } = await createAgentSession({
       cwd: project.dir,
       model,
@@ -356,86 +300,85 @@ export async function createHarness() {
       // if none exists), so a harness restart or settings-change respawn keeps
       // conversation memory instead of silently wiping it.
       sessionManager: SessionManager.continueRecent(project.dir),
-      tools: subEnabled ? [...TOOLS, "subagent"] : [...TOOLS],
-      customTools: subEnabled ? [makeSubagentTool(project)] : [],
+      tools,
       thinkingLevel: settings.thinking,
     });
     captureManifest(session);
-    // Capture the unsubscribe handle so disposeLead() can tear the listener down
-    // when this lead is replaced (settings change) — otherwise subscriptions and
+    // Capture the unsubscribe handle so disposeAgent() can tear the listener down
+    // when this agent is replaced (settings change) — otherwise subscriptions and
     // sessions leak with every respawn.
     const unsubscribe = session.subscribe((event) => routeEvent(project.id, event));
-    const lead = { session, busy: false, unsubscribe };
-    console.log(`[harness] spun up lead for ${project.name} (${project.dir})`);
-    return lead;
+    const agent = { session, busy: false, unsubscribe };
+    console.log(`[harness] spun up agent for ${project.name} (${project.dir})`);
+    return agent;
   }
-  function disposeLead(leadOrPromise) {
-    Promise.resolve(leadOrPromise)
-      .then((lead) => {
-        try { lead?.unsubscribe?.(); } catch {}
-        try { lead?.session?.dispose?.(); } catch {}
+  function disposeAgent(agentOrPromise) {
+    Promise.resolve(agentOrPromise)
+      .then((agent) => {
+        try { agent?.unsubscribe?.(); } catch {}
+        try { agent?.session?.dispose?.(); } catch {}
       })
-      .catch(() => {}); // a lead that never resolved has nothing to dispose
+      .catch(() => {}); // an agent that never resolved has nothing to dispose
   }
-  function getLead(project) {
+  function getAgent(project) {
     // The cache creates lazily and evicts a failed creation so one transient
     // failure never permanently bricks the project.
-    return leads.getOrCreate(project.id, () => createLead(project));
+    return agents.getOrCreate(project.id, () => createAgent(project));
   }
 
-  // Run one user turn against a project's lead. Emits typing/done/error (and,
-  // through the session, delta/step/usage/subagent). Never throws — failures
-  // surface as an "error" event so the caller can stay a thin forwarder.
+  // Run one user turn against a project's agent. Emits typing/done/error (and,
+  // through the session, delta/step/usage). Never throws — failures surface as
+  // an "error" event so the caller can stay a thin forwarder.
   async function prompt(projectId, text) {
     const project = loadProjects().find((p) => p.id === projectId);
     if (!project) return emit(msg.error(projectId, "unknown project"));
 
-    let lead;
+    let agent;
     try {
-      lead = await getLead(project);
+      agent = await getAgent(project);
     } catch (e) {
-      return emit(msg.error(project.id, "couldn't start lead: " + (e?.message ?? e)));
+      return emit(msg.error(project.id, "couldn't start agent: " + (e?.message ?? e)));
     }
-    if (lead.busy) return emit(msg.error(project.id, "still working on the last one…"));
+    if (agent.busy) return emit(msg.error(project.id, "still working on the last one…"));
 
-    lead.busy = true;
+    agent.busy = true;
     emit(msg.typing(project.id));
     try {
-      await lead.session.prompt(text);
+      await agent.session.prompt(text);
       emit(msg.done(project.id));
     } catch (e) {
       emit(msg.error(project.id, e?.message ?? String(e)));
     } finally {
-      lead.busy = false;
+      agent.busy = false;
     }
   }
 
-  // Cancel a project's in-flight turn (if any). No-op when the lead isn't live
+  // Cancel a project's in-flight turn (if any). No-op when the agent isn't live
   // or isn't busy. The aborted prompt() rejects and surfaces its own event.
   async function abort(projectId) {
-    if (!leads.has(projectId)) return;
+    if (!agents.has(projectId)) return;
     try {
-      const lead = await leads.get(projectId);
-      if (lead?.busy) await lead.session.abort();
+      const agent = await agents.get(projectId);
+      if (agent?.busy) await agent.session.abort();
     } catch {
-      // a lead mid-creation or a benign abort race — nothing to cancel
+      // an agent mid-creation or a benign abort race — nothing to cancel
     }
   }
 
-  // Conversation backscroll for a project's lead, so a freshly-connected client
+  // Conversation backscroll for a project's agent, so a freshly-connected client
   // (the TUI) can render history instead of only future events. Reads the SDK's
   // persisted session.messages and flattens to { role, text, ts } — only the
   // user/assistant turns that map to chat bubbles (tool results, thinking,
   // tool calls and custom bookkeeping messages are dropped). Returns [] if the
-  // lead hasn't been spawned yet (no session, nothing to replay).
+  // agent hasn't been spawned yet (no session, nothing to replay).
   async function getMessages(projectId) {
     const project = loadProjects().find((p) => p.id === projectId);
     if (!project) return [];
-    // Resume the lead (continueRecent under the hood) so backscroll is real even
+    // Resume the agent (continueRecent under the hood) so backscroll is real even
     // right after a restart, before any new prompt. Cached, so this spawns once.
     let session;
     try {
-      ({ session } = await getLead(project));
+      ({ session } = await getAgent(project));
     } catch {
       return [];
     }
@@ -468,12 +411,9 @@ export async function createHarness() {
       provider: settings.provider,
       model: settings.model,
       thinking: settings.thinking,
-      toolNames: TOOLS,
-      tools: tools || TOOLS.map((n) => ({ name: n, description: "", schema: null, source: "builtin" })),
-      systemPrompt: leadPrompt(dir, settings.subagent.enabled),
-      subagent: settings.subagent,
-      subagentTools: SUBAGENT_TOOLS,
-      subagentSystemPrompt: subagentPrompt(dir),
+      toolNames: settings.tools,
+      tools: tools || settings.tools.map((n) => ({ name: n, description: "", schema: null, source: "builtin" })),
+      systemPrompt: renderPrompt(dir, settings.tools),
       project: proj ? { id: proj.id, name: proj.name, dir: proj.dir } : null,
     };
   }
@@ -484,11 +424,10 @@ export async function createHarness() {
       provider: settings.provider,
       model: settings.model,
       thinking: settings.thinking,
-      tools: TOOLS,
+      tools: settings.tools,
+      toolChoices: ALL_TOOLS,
       thinkingLevels: THINKING_LEVELS,
       models: await availableModels(),
-      subagent: settings.subagent,
-      subagentTools: SUBAGENT_TOOLS,
     };
   }
 

@@ -1,7 +1,7 @@
-// pi-lead harness service — the network face of the harness core.
+// pi harness service — the network face of the harness core.
 // HTTP: GET/POST /config, GET/POST /projects, GET /manifest, GET /messages, GET /health.
 // WS:   client sends { type:"user", project, text }; server streams the tagged
-//       lifecycle events (hello/typing/step/usage/subagent/delta/done/error).
+//       lifecycle events (hello/typing/step/usage/delta/done/error).
 // The web app is the only expected client; browsers never talk to this directly.
 
 import { createServer } from "node:http";
@@ -69,7 +69,7 @@ const httpServer = createServer(async (req, res) => {
   if (url === "/config" && req.method === "POST") {
     try {
       const s = harness.applySettings(JSON.parse((await readBody(req)) || "{}"));
-      return json(res, 200, { provider: s.provider, model: s.model, thinking: s.thinking, subagent: s.subagent });
+      return json(res, 200, { provider: s.provider, model: s.model, thinking: s.thinking, tools: s.tools });
     } catch (e) {
       return json(res, 400, { error: e?.message ?? String(e) });
     }
@@ -80,7 +80,7 @@ const httpServer = createServer(async (req, res) => {
     return json(res, 200, await harness.getManifest(q.get("project")));
   }
 
-  // Conversation backscroll for a project (empty until its lead has been used).
+  // Conversation backscroll for a project (empty until its agent has been used).
   if (url === "/messages" && req.method === "GET") {
     const q = new URL(req.url, "http://localhost").searchParams;
     return json(res, 200, await harness.getMessages(q.get("project")));
