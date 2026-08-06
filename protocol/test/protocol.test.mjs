@@ -42,9 +42,6 @@ test("full outbound vocabulary round-trips through builders + schemas", () => {
     msg.typing("/p"),
     msg.step("/p", "bash"),
     msg.usage("/p", 10, 20),
-    msg.subagentStart("/p", "call-1", "dig into X", "gpt-5.6-sol"),
-    msg.subagentEnd("/p", "call-1", true, "findings"),
-    msg.subagentEnd("/p", "call-1", false, "boom"),
     msg.done("/p"),
     msg.error("/p", "nope"),
   ];
@@ -67,13 +64,6 @@ test("tool lifecycle: step (with id/args) + tool_end round-trip", () => {
   assert.equal(r.value.ok, true);
   // tool_end requires toolCallId + ok
   assert.equal(validateOutbound({ type: OUT.TOOL_END, project: "/p", tool: "bash" }).ok, false);
-});
-
-test("subagent discriminated union rejects mixed shapes", () => {
-  // phase:start must not carry end-only fields as its whole shape
-  assert.equal(validateOutbound({ type: OUT.SUBAGENT, project: "/p", id: "x", phase: "start" }).ok, false); // missing task
-  assert.equal(validateOutbound({ type: OUT.SUBAGENT, project: "/p", id: "x", phase: "end", ok: true }).ok, false); // missing result
-  assert.equal(validateOutbound({ type: OUT.SUBAGENT, project: "/p", id: "x", phase: "bogus" }).ok, false);
 });
 
 test("resume frame round-trips (tool present or null)", () => {

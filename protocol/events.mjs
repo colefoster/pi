@@ -12,7 +12,6 @@ export const OUT = Object.freeze({
   STEP: "step", // { project, tool, toolCallId, args } (args/id: Phase 4)
   TOOL_END: "tool_end", // { project, toolCallId, result, isError } (Phase 4)
   USAGE: "usage", // { project, input, output }
-  SUBAGENT: "subagent", // { project, id, phase, ... }
   DONE: "done", // { project }
   ERROR: "error", // { project, text }
 });
@@ -36,8 +35,6 @@ export const msg = {
   step: (project, tool, toolCallId, args) => ({ type: OUT.STEP, project, tool, toolCallId, args }),
   toolEnd: (project, toolCallId, tool, ok) => ({ type: OUT.TOOL_END, project, toolCallId, tool, ok }),
   usage: (project, input, output) => ({ type: OUT.USAGE, project, input, output }),
-  subagentStart: (project, id, task, model) => ({ type: OUT.SUBAGENT, project, id, phase: "start", task, model }),
-  subagentEnd: (project, id, ok, result) => ({ type: OUT.SUBAGENT, project, id, phase: "end", ok, result }),
   done: (project) => ({ type: OUT.DONE, project }),
   error: (project, text) => ({ type: OUT.ERROR, project, text }),
   // inbound

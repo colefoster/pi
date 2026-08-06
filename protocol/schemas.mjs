@@ -47,25 +47,6 @@ export const OUTBOUND_SCHEMAS = {
     input: z.number().int(),
     output: z.number().int(),
   }),
-  // subagent is polymorphic on `phase`.
-  [OUT.SUBAGENT]: z.discriminatedUnion("phase", [
-    z.object({
-      type: z.literal(OUT.SUBAGENT),
-      project,
-      id: z.string(),
-      phase: z.literal("start"),
-      task: z.string(),
-      model: z.string().optional(),
-    }),
-    z.object({
-      type: z.literal(OUT.SUBAGENT),
-      project,
-      id: z.string(),
-      phase: z.literal("end"),
-      ok: z.boolean(),
-      result: z.string(),
-    }),
-  ]),
   [OUT.DONE]: z.object({ type: z.literal(OUT.DONE), project }),
   [OUT.ERROR]: z.object({ type: z.literal(OUT.ERROR), project, text: z.string() }),
 };
