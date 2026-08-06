@@ -5,8 +5,8 @@
 //
 // Events broadcast to ALL ws clients, so every event except `hello` carries a
 // `project` field — the caller filters by it. Turn lifecycle per project:
-//   typing → (delta|step|usage|subagent)* → done | error
-// A lead is single-flight: sending while it's busy yields an `error` event.
+//   typing → (delta|step|usage)* → done | error
+// The agent is single-flight: sending while it's busy yields an `error` event.
 
 import { createClient as createProtocolClient, PROTOCOL_VERSION } from "@pi/protocol";
 import { WebSocket } from "ws";

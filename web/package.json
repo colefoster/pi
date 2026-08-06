@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "Browser UI for the pi-lead harness — a thin edge that proxies + bridges to the harness over HTTP/WS",
+  "description": "Browser UI for the pi harness — a thin edge that proxies + bridges to the harness over HTTP/WS",
   "scripts": {
     "start": "node server.mjs"
   },

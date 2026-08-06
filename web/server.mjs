@@ -1,4 +1,4 @@
-// pi-lead web app — serves the browser UI and bridges it to the harness service.
+// pi web app — serves the browser UI and bridges it to the harness service.
 // Lives in its own repo (../pi); reaches the harness over HTTP/WS via HARNESS_URL.
 // Static:  everything under ./public (index.html, tokens.css, …).
 // HTTP:    /config, /projects, /manifest are proxied straight to the harness.

@@ -1,14 +1,14 @@
 /* Hallmark · theme: custom "late-night cockpit" · genre: atmospheric
  * paper: deep cool charcoal (oklch ~15% 245) · accent: cyan phosphor (oklch 82% .13 202)
  * display: Space Grotesk · body: Inter · mono: JetBrains Mono
- * portable token system for pi-lead — imported by index.html
+ * portable token system for pi — imported by index.html
  */
 :root {
   /* ---- paper (dark, layered, cool) ---- */
   --color-bg:        oklch(15.5% 0.012 245);   /* app canvas — deepest visible */
   --color-side:      oklch(13%   0.013 245);   /* sidebar — one band deeper */
   --color-panel:     oklch(18.5% 0.013 245);   /* header / footer / composer chrome */
-  --color-raised:    oklch(22%   0.014 245);   /* hover surfaces, lead bubbles */
+  --color-raised:    oklch(22%   0.014 245);   /* hover surfaces, agent bubbles */
   --color-me:        oklch(31%   0.045 222);   /* user bubble — cyan-tinted deep */
 
   /* ---- rules ---- */

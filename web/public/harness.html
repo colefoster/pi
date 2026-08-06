@@ -426,11 +426,6 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .tsum-badges { display: inline-flex; align-items: center; gap: var(--space-2xs); flex-shrink: 0; }
-  .avail { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em; padding: 1px 6px;
-    border-radius: 999px; border: 1px solid var(--color-line-soft); color: var(--color-faint); }
-  .avail.lead { color: var(--color-accent); border-color: var(--color-accent-dim); }
-  /* full box reset — the bare `.sub` run-card rule otherwise hijacks padding/radius/background here */
-  .avail.sub { color: var(--color-dim); background: none; border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 6px; }
   .tbody { padding: 0 var(--space-md) var(--space-md); display: flex; flex-direction: column; gap: var(--space-md); }
   .tbody .tdesc { margin: 0; color: var(--color-dim); font-size: var(--text-sm); line-height: 1.5; }
   .tsub-h { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
@@ -454,53 +449,30 @@
   .schema-toggle:hover { color: var(--color-accent); }
 
   /* ============================================================
-     SUB-AGENT RUNS + LEADS
+     AGENT TABLE
      ============================================================ */
-  .sub {
-    background: color-mix(in oklch, var(--color-panel) 65%, var(--color-bg));
-    border: 1px solid var(--color-line-soft);
-    border-left: 2px solid var(--color-accent-dim);
-    border-radius: var(--radius-md); padding: var(--space-md) var(--space-lg);
-  }
-  .sub + .sub { margin-top: var(--space-sm); }
-  .sub-top { display: flex; align-items: center; gap: var(--space-sm); }
-  .sub-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: var(--color-line); }
-  .sub.running { border-left-color: var(--color-accent); }
-  .sub.running .sub-dot { background: var(--color-accent); box-shadow: 0 0 8px var(--color-accent-glow);
-    animation: pulse 1.4s var(--ease-in-out) infinite; }
-  .sub.error { border-left-color: var(--color-danger); }
-  .sub.error .sub-dot { background: var(--color-danger); }
-  .sub-task { flex: 1; min-width: 0; font-size: var(--text-base); color: var(--color-txt); line-height: 1.45; }
-  .sub-meta { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; }
-  .sub-t { font-family: var(--font-mono); font-size: 10px; color: var(--color-faint); font-variant-numeric: tabular-nums; }
-  .sub-res {
-    margin-top: var(--space-sm); font-size: var(--text-sm); line-height: 1.5; color: var(--color-dim);
-    padding-top: var(--space-sm); border-top: 1px solid var(--color-line-soft);
-    white-space: pre-wrap; word-break: break-word;
-  }
-  .sub-res .rk { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-faint); }
   .st-badge { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; padding: 1px 7px; border-radius: 999px; }
   .st-badge.running { color: var(--color-accent); border: 1px solid var(--color-accent-dim); }
   .st-badge.done { color: var(--color-dim); border: 1px solid var(--color-line); }
   .st-badge.error { color: var(--color-danger); border: 1px solid color-mix(in oklch, var(--color-danger) 45%, var(--color-line)); }
 
-  /* leads table */
-  .lead-row {
+  /* agents table */
+  .agent-row {
     display: grid; grid-template-columns: 12px minmax(0,1.4fr) minmax(0,2fr) auto auto;
     align-items: center; gap: var(--space-md);
     padding: var(--space-md); border-radius: var(--radius-md);
     border: 1px solid var(--color-line-soft);
     background: color-mix(in oklch, var(--color-panel) 65%, var(--color-bg));
   }
-  .lead-row + .lead-row { margin-top: var(--space-xs); }
-  .lead-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-line); }
-  .lead-dot.busy { background: var(--color-accent); box-shadow: 0 0 8px var(--color-accent-glow); animation: pulse 1.4s var(--ease-in-out) infinite; }
-  .lead-name { font-size: var(--text-base); color: var(--color-txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .lead-dir { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .lead-act { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-dim); text-align: right; white-space: nowrap; }
+  .agent-row + .agent-row { margin-top: var(--space-xs); }
+  .agent-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-line); }
+  .agent-dot.busy { background: var(--color-accent); box-shadow: 0 0 8px var(--color-accent-glow); animation: pulse 1.4s var(--ease-in-out) infinite; }
+  .agent-name { font-size: var(--text-base); color: var(--color-txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .agent-dir { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .agent-act { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-dim); text-align: right; white-space: nowrap; }
   @media (max-width: 720px) {
-    .lead-row { grid-template-columns: 12px 1fr auto; }
-    .lead-dir, .lead-act { display: none; }
+    .agent-row { grid-template-columns: 12px 1fr auto; }
+    .agent-dir, .agent-act { display: none; }
   }
 
   /* ============================================================
@@ -536,7 +508,6 @@
   .ev.step .em code { color: var(--color-txt); }
   .ev.tool_end .ek { color: var(--color-dim); }
   .ev.tool_end .em code { color: var(--color-txt); }
-  .ev.subagent .ek, .ev.subagent .em { color: var(--color-accent); }
   .ev.usage .ek { color: var(--color-dim); }
   .ev.delta .em { color: var(--color-txt); }
   .ev.done .ek { color: var(--color-dim); }
@@ -593,9 +564,9 @@
     <span class="top-stat opt"><span class="conn-dot on" id="connDot"></span> <b>harness</b> online</span>
     <span class="top-stat sep opt"><b>web</b> :5178</span>
     <span class="top-stat opt"><b>harness</b> :5179</span>
-    <span class="top-stat sep"><b>leads</b> <span id="topLeads">5</span></span>
+    <span class="top-stat sep"><b>agents</b> <span id="topAgents">5</span></span>
     <button class="btn ghost sm live-toggle" id="liveToggle" type="button">Activity</button>
-    <a class="top-back" href="/index.html">‹ Leads</a>
+    <a class="top-back" href="/index.html">‹ Agents</a>
   </div>
 
   <div class="shell">
@@ -605,9 +576,8 @@
       <button class="nav-item active" data-sec="overview"><span class="ico">◉</span><span class="lbl">Overview</span></button>
       <span class="nav-cap">Configuration</span>
       <button class="nav-item" data-sec="model"><span class="ico">⚡</span><span class="lbl">Model &amp; Reasoning</span></button>
-      <button class="nav-item" data-sec="subagents"><span class="ico">⧉</span><span class="lbl">Sub-agents</span><span class="badge" id="navSubBadge">2</span></button>
       <button class="nav-item" data-sec="tools"><span class="ico">⚒</span><span class="lbl">Tools</span><span class="badge" id="navToolBadge">8</span></button>
-      <button class="nav-item" data-sec="repos"><span class="ico">▤</span><span class="lbl">Repos / Leads</span><span class="badge" id="navRepoBadge">5</span></button>
+      <button class="nav-item" data-sec="repos"><span class="ico">▤</span><span class="lbl">Repos / Agents</span><span class="badge" id="navRepoBadge">5</span></button>
       <span class="nav-cap">Local</span>
       <button class="nav-item" data-sec="prefs"><span class="ico">◐</span><span class="lbl">Preferences</span></button>
       <button class="nav-item" data-sec="env"><span class="ico">⌗</span><span class="lbl">Environment</span></button>
@@ -620,7 +590,7 @@
       <section class="section active" data-sec="overview">
         <div class="sec-head">
           <h1>Overview</h1>
-          <p>Health and live state of the harness — the standalone agent service that owns the pi runtime, the leads, sub-agents, and the projects registry.</p>
+          <p>Health and live state of the harness — the standalone agent service that owns the pi runtime, the agents, and the projects registry.</p>
         </div>
 
         <div class="stat-grid" id="statGrid"></div>
@@ -632,15 +602,15 @@
           </div>
 
           <div class="block">
-            <h3 class="block-title">Per-lead status</h3>
-            <div class="card" id="ovLeads"></div>
+            <h3 class="block-title">Per-agent status</h3>
+            <div class="card" id="ovAgents"></div>
           </div>
         </div>
 
         <div class="block">
           <h3 class="block-title">Recent events <span class="n" id="ovFeedNote">· live in the Activity rail →</span></h3>
           <div class="card" style="padding: var(--space-md) var(--space-lg)">
-            <p style="margin:0;color:var(--color-dim);font-size:var(--text-sm)">The full streaming feed is pinned to the right. Each response reports <code style="font-family:var(--font-mono);color:var(--color-txt)">steps · time · tokens · N agents</code> — the harness emits <span style="font-family:var(--font-mono);color:var(--color-accent-dim)">delta · step · usage · subagent · typing · done · error</span> per project over the WS.</p>
+            <p style="margin:0;color:var(--color-dim);font-size:var(--text-sm)">The full streaming feed is pinned to the right. Each response reports <code style="font-family:var(--font-mono);color:var(--color-txt)">steps · time · tokens</code> — the harness emits <span style="font-family:var(--font-mono);color:var(--color-accent-dim)">delta · step · tool_end · usage · typing · done · error</span> per project over the WS.</p>
           </div>
         </div>
       </section>
@@ -649,12 +619,12 @@
       <section class="section" data-sec="model">
         <div class="sec-head">
           <h1>Model &amp; Reasoning</h1>
-          <p>Shared across every lead. The dropdown lists the models your ChatGPT subscription exposes. Changes are validated, persisted to <code style="font-family:var(--font-mono)">settings.json</code>, and take effect on each lead's next message.</p>
+          <p>Shared across every agent. The dropdown lists the models your ChatGPT subscription exposes. Changes are validated, persisted to <code style="font-family:var(--font-mono)">settings.json</code>, and take effect on each agent's next message.</p>
         </div>
 
         <div class="pending" id="modelPending" hidden>
           <span class="pico">◷</span>
-          <span><b>Pending — applies on next turn.</b> <small id="modelPendingText">Cached leads are dropped &amp; respawn with the new setting on their next message; any in-flight reply finishes on the old one.</small></span>
+          <span><b>Pending — applies on next turn.</b> <small id="modelPendingText">Cached agents are dropped &amp; respawn with the new setting on their next message; any in-flight reply finishes on the old one.</small></span>
         </div>
 
         <div class="cols2">
@@ -689,65 +659,8 @@
         </div>
 
         <div class="block">
-          <h3 class="block-title">Effect on running leads</h3>
-          <div class="card" id="modelLeadEffect"></div>
-        </div>
-      </section>
-
-      <!-- ---------- SUB-AGENTS ---------- -->
-      <section class="section" data-sec="subagents">
-        <div class="sec-head">
-          <h1>Sub-agents</h1>
-          <p>A lead can delegate a read-only investigation to a cheaper, restricted sub-agent — its own model, its own toolset, its own system prompt. The lead stays on task while the dig runs; results fold back into the reply. The response status line counts these as <code style="font-family:var(--font-mono)">N agents</code>.</p>
-        </div>
-
-        <div class="cols2">
-          <div class="block">
-            <h3 class="block-title">Configuration</h3>
-            <div class="card pad-lg" style="display:flex;flex-direction:column;gap:var(--space-lg)">
-              <label class="switch-row">
-                <span>Enabled<small>Let leads delegate heavy read-only digs</small></span>
-                <input type="checkbox" class="switch" id="subEnabled" checked />
-              </label>
-              <div class="field">
-                <span class="field-label">Model <em>— cost-optimised</em></span>
-                <select class="field-input mono" id="subModel">
-                  <option value="gpt-5.4-mini" selected>gpt-5.4-mini (openai-codex)</option>
-                  <option value="gpt-5.4">gpt-5.4 (openai-codex)</option>
-                  <option value="gpt-5.3-codex-spark">gpt-5.3-codex-spark (openai-codex)</option>
-                </select>
-                <p style="margin:var(--space-2xs) 0 0;font-size:var(--text-xs);color:var(--color-faint)">Today fixed by <code style="font-family:var(--font-mono)">PI_SUBAGENT_MODEL</code>; provider inherited from the lead. This control promotes it to first-class.</p>
-              </div>
-              <div class="field">
-                <span class="field-label">Thinking</span>
-                <div class="seg" id="subThinkSeg" role="group" aria-label="Sub-agent thinking level"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="block">
-            <h3 class="block-title">Tool allow-list <span class="n">· read-only</span></h3>
-            <div class="card" style="display:flex;flex-direction:column;gap:var(--space-md)">
-              <p style="margin:0;font-size:var(--text-sm);color:var(--color-dim)">The sub-agent is confined to non-mutating tools. Write, edit, patch, and shell are withheld.</p>
-              <div class="chips" id="subToolChips"></div>
-              <div style="border-top:1px solid var(--color-line-soft);padding-top:var(--space-md)">
-                <p class="tsub-h">Withheld from sub-agents</p>
-                <div class="chips" id="subDenyChips"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="block">
-          <h3 class="block-title">System prompt</h3>
-          <div class="card" style="padding:0">
-            <pre class="schema" style="max-height:200px;border:0;background:transparent" id="subPrompt"></pre>
-          </div>
-        </div>
-
-        <div class="block">
-          <h3 class="block-title">Runs <span class="n">· live &amp; recent</span></h3>
-          <div id="subRuns"></div>
+          <h3 class="block-title">Effect on the running agent</h3>
+          <div class="card" id="modelAgentEffect"></div>
         </div>
       </section>
 
@@ -755,7 +668,7 @@
       <section class="section" data-sec="tools">
         <div class="sec-head">
           <h1>Tools</h1>
-          <p>The manifest the harness hands the model. Each definition carries a name, description, JSON schema, and usage guidelines. <span class="avail lead" style="vertical-align:middle">lead</span> tools are available to leads; <span class="avail sub" style="vertical-align:middle">sub-agent</span> tools are also handed to sub-agents.</p>
+          <p>The manifest the harness hands the model. Each definition carries a name, description, JSON schema, and usage guidelines — every tool here is available to the agent.</p>
         </div>
 
         <div class="tool-toolbar">
@@ -764,7 +677,6 @@
             <button data-f="all" class="on">All</button>
             <button data-f="builtin">Builtin</button>
             <button data-f="custom">Custom</button>
-            <button data-f="sub">Sub-agent</button>
           </div>
         </div>
         <div class="block-title" style="margin-top:calc(-1 * var(--space-md))"><span class="n" id="toolCount"></span></div>
@@ -773,11 +685,11 @@
         <p id="toolEmpty" style="display:none;color:var(--color-faint);font-size:var(--text-sm);text-align:center;padding:var(--space-xl)">No tools match.</p>
       </section>
 
-      <!-- ---------- REPOS / LEADS ---------- -->
+      <!-- ---------- REPOS / AGENTS ---------- -->
       <section class="section" data-sec="repos">
         <div class="sec-head">
-          <h1>Repos / Leads</h1>
-          <p>Each repo is a lead with its own persistent pi session. The registry lives in <code style="font-family:var(--font-mono)">projects.json</code> — an entry is <code style="font-family:var(--font-mono)">{ id, name, dir }</code> where <code style="font-family:var(--font-mono)">id</code> equals the absolute dir. A green dot means the lead is working.</p>
+          <h1>Repos / Agents</h1>
+          <p>Each repo is an agent with its own persistent pi session. The registry lives in <code style="font-family:var(--font-mono)">projects.json</code> — an entry is <code style="font-family:var(--font-mono)">{ id, name, dir }</code> where <code style="font-family:var(--font-mono)">id</code> equals the absolute dir. A green dot means the agent is working.</p>
         </div>
 
         <div class="tool-toolbar">
@@ -786,7 +698,7 @@
           <button class="btn primary" id="addRepoBtn" type="button">＋ Add repo</button>
         </div>
 
-        <div class="block" id="leadList"></div>
+        <div class="block" id="agentList"></div>
       </section>
 
       <!-- ---------- PREFERENCES ---------- -->
@@ -848,7 +760,7 @@
       <div class="live-head">
         <span class="live-dot"></span>
         <h2>Activity</h2>
-        <span class="tag" id="liveScope">all leads</span>
+        <span class="tag" id="liveScope">all agents</span>
       </div>
       <div class="live-chips" id="liveChips"></div>
       <div class="feed" id="feed"></div>
@@ -870,40 +782,31 @@
     if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
     return d;
   }
-  // a tool step is an "agent" step when it delegates to a sub-agent
-  const isAgentTool = (n) => /subagent|agent|spawn|delegate|^task$/i.test(n || "");
-
   // Module top-level await: the rest of the module runs once these resolve.
-  let CONFIG, PROJECTS, MANIFEST, SUB_ALLOW, SUB_DENY, SUB_PROMPT, TOOLS;
-  let SUB_RUNS = [];            // live sub-agent runs, newest last (rendered reversed)
-  let pendModel, pendThinking;  // latest UI selections (may be ahead of running leads)
+  let CONFIG, PROJECTS, MANIFEST, TOOLS;
+  let pendModel, pendThinking;  // latest UI selections (may be ahead of the running agent)
   let loadOK = true;
 
-  const newLeadState = (p) => ({ ...p, busy: false, lastAt: 0, steps: 0, agents: 0, tokens: 0, subs: [] });
+  const newAgentState = (p) => ({ ...p, busy: false, lastAt: 0, steps: 0, tokens: 0 });
 
   try {
     const [, cfg, projs] = await Promise.all([ jget("/health"), jget("/config"), jget("/projects") ]);
     CONFIG = cfg;
-    PROJECTS = (projs || []).map(newLeadState);
+    PROJECTS = (projs || []).map(newAgentState);
     const firstId = PROJECTS[0]?.id;
     MANIFEST = firstId ? await jget("/manifest?project=" + encodeURIComponent(firstId)) : {};
   } catch (err) {
     loadOK = false;
     console.warn("harness load failed:", err);
-    CONFIG = { provider: "—", model: "—", thinking: "—", thinkingLevels: [], models: [], subagent: { enabled: false, model: "—", thinking: "—" }, subagentTools: [] };
+    CONFIG = { provider: "—", model: "—", thinking: "—", thinkingLevels: [], models: [] };
     PROJECTS = [];
     MANIFEST = {};
   }
 
   pendModel = CONFIG.model; pendThinking = CONFIG.thinking;
 
-  // derive tool + sub-agent view data from config + manifest
-  const subTools = CONFIG.subagentTools || MANIFEST.subagentTools || [];
-  const leadToolNames = MANIFEST.toolNames || CONFIG.tools || [];
-  SUB_ALLOW = subTools.slice();
-  SUB_DENY  = leadToolNames.filter(n => !subTools.includes(n));
-  SUB_PROMPT = MANIFEST.subagentSystemPrompt || "(none)";
-  TOOLS = (MANIFEST.tools || []).map(t => ({ ...t, sub: subTools.includes(t.name) }));
+  // tool manifest handed to the agent
+  TOOLS = MANIFEST.tools || [];
 
   /* ============================================================
      NAV SWITCHING
@@ -919,13 +822,13 @@
   navItems.forEach(n => n.addEventListener("click", () => showSec(n.dataset.sec)));
 
   /* ============================================================
-     OVERVIEW + REPOS: per-lead rows, stats, health
+     OVERVIEW + REPOS: per-agent rows, stats, health
      ============================================================ */
   const stateFor = (id) => PROJECTS.find(p => p.id === id);
-  const topLeadsEl = document.getElementById("topLeads");
+  const topAgentsEl = document.getElementById("topAgents");
   const navRepoBadge = document.getElementById("navRepoBadge");
-  const ovLeads = document.getElementById("ovLeads");
-  const leadList = document.getElementById("leadList");
+  const ovAgents = document.getElementById("ovAgents");
+  const agentList = document.getElementById("agentList");
   const statGrid = document.getElementById("statGrid");
   const healthCard = document.getElementById("healthCard");
   let wsConnected = false;
@@ -941,15 +844,11 @@
     const busy = PROJECTS.filter(p => p.busy).length;
     const builtin = TOOLS.filter(t => t.source === "builtin").length;
     const custom = TOOLS.length - builtin;
-    const running = SUB_RUNS.filter(r => r.status === "running").length;
-    const ok = SUB_RUNS.filter(r => r.status === "done").length;
-    const fail = SUB_RUNS.filter(r => r.status === "error").length;
     const tokens = PROJECTS.reduce((a, p) => a + (p.tokens || 0), 0);
     statGrid.innerHTML =
-      `<div class="stat"><span class="k">Active leads</span><span class="v accent">${busy} <span class="u">/ ${PROJECTS.length}</span></span><span class="foot">working right now</span></div>` +
+      `<div class="stat"><span class="k">Active agents</span><span class="v accent">${busy} <span class="u">/ ${PROJECTS.length}</span></span><span class="foot">working right now</span></div>` +
       `<div class="stat"><span class="k">Model</span><span class="v" style="font-size:var(--text-lg)">${esc(CONFIG.model)}</span><span class="foot">thinking · ${esc(CONFIG.thinking)}</span></div>` +
       `<div class="stat"><span class="k">Tools</span><span class="v">${TOOLS.length} <span class="u">defs</span></span><span class="foot">${builtin} builtin · ${custom} custom</span></div>` +
-      `<div class="stat"><span class="k">Sub-agent runs</span><span class="v">${SUB_RUNS.length} <span class="u">session</span></span><span class="foot">${running} running · ${ok} ok · ${fail} fail</span></div>` +
       `<div class="stat"><span class="k">Tokens</span><span class="v">${fmtTok(tokens)}</span><span class="foot">session total</span></div>`;
   }
 
@@ -961,32 +860,32 @@
       `<div class="hrow"><span class="light ok"></span><span class="hlabel">Web app<small>serves public/ · proxies control API</small></span><span class="hval">:${location.port || (location.protocol === "https:" ? "443" : "80")}</span></div>`;
   }
 
-  function renderOvLeads() {
-    ovLeads.innerHTML = PROJECTS.length ? PROJECTS.map(p =>
+  function renderOvAgents() {
+    ovAgents.innerHTML = PROJECTS.length ? PROJECTS.map(p =>
       `<div class="hrow"><span class="light ${p.busy ? "ok" : ""}"></span>` +
       `<span class="hlabel">${esc(p.name)}<small>${esc(p.dir)}</small></span>` +
       `<span class="hval">${p.busy ? "working" : "idle" + (p.lastAt ? " · " + esc(fmtAgo(p.lastAt)) : "")}</span></div>`
-    ).join("") : `<p style="margin:0;color:var(--color-faint);font-size:var(--text-sm)">No leads registered.</p>`;
+    ).join("") : `<p style="margin:0;color:var(--color-faint);font-size:var(--text-sm)">No agents registered.</p>`;
   }
 
-  function renderLeads() {
-    leadList.innerHTML = PROJECTS.length ? PROJECTS.map(p =>
-      `<div class="lead-row">` +
-        `<span class="lead-dot ${p.busy ? "busy" : ""}"></span>` +
-        `<span class="lead-name">${esc(p.name)}</span>` +
-        `<span class="lead-dir">${esc(p.dir)}</span>` +
-        `<span class="lead-act">${p.busy ? "● working" : esc(fmtAgo(p.lastAt))}</span>` +
+  function renderAgents() {
+    agentList.innerHTML = PROJECTS.length ? PROJECTS.map(p =>
+      `<div class="agent-row">` +
+        `<span class="agent-dot ${p.busy ? "busy" : ""}"></span>` +
+        `<span class="agent-name">${esc(p.name)}</span>` +
+        `<span class="agent-dir">${esc(p.dir)}</span>` +
+        `<span class="agent-act">${p.busy ? "● working" : esc(fmtAgo(p.lastAt))}</span>` +
         `<button class="btn danger sm" type="button" disabled title="Repo removal isn't supported by the harness yet">Remove</button>` +
       `</div>`
     ).join("") : `<p style="color:var(--color-faint);font-size:var(--text-sm)">No repos registered — add one above.</p>`;
   }
 
-  function renderLeadViews() {
-    topLeadsEl.textContent = PROJECTS.length;
+  function renderAgentViews() {
+    topAgentsEl.textContent = PROJECTS.length;
     navRepoBadge.textContent = PROJECTS.length;
-    renderStatGrid(); renderHealth(); renderOvLeads(); renderLeads();
+    renderStatGrid(); renderHealth(); renderOvAgents(); renderAgents();
   }
-  renderLeadViews();
+  renderAgentViews();
 
   // Add repo → POST /projects, then refresh the list from the returned registry.
   const addRepoBtn = document.getElementById("addRepoBtn");
@@ -1001,10 +900,10 @@
       const data = await jpost("/projects", { dir, name: repoNameEl.value.trim() });
       PROJECTS = (data.list || []).map(p => {
         const prev = stateFor(p.id);
-        return prev ? { ...prev, ...p } : newLeadState(p);
+        return prev ? { ...prev, ...p } : newAgentState(p);
       });
       repoDirEl.value = ""; repoNameEl.value = "";
-      renderLeadViews(); renderLeadEffect();
+      renderAgentViews(); renderAgentEffect();
     } catch (err) {
       alert("Couldn't add repo: " + (err.message || err));
     } finally {
@@ -1023,10 +922,10 @@
   const pending = document.getElementById("modelPending");
   const pendingPico = pending.querySelector(".pico");
   const pendingText = document.getElementById("modelPendingText");
-  const leadEffect = document.getElementById("modelLeadEffect");
+  const agentEffect = document.getElementById("modelAgentEffect");
 
-  function renderLeadEffect() {
-    leadEffect.innerHTML = PROJECTS.length ? PROJECTS.map(p => {
+  function renderAgentEffect() {
+    agentEffect.innerHTML = PROJECTS.length ? PROJECTS.map(p => {
       const changed = pendModel !== CONFIG.model || pendThinking !== CONFIG.thinking;
       const st = p.busy
         ? `<span class="st-badge running">in-flight · old settings</span>`
@@ -1035,7 +934,7 @@
       return `<div class="hrow"><span class="light ${p.busy ? "ok" : ""}"></span>` +
         `<span class="hlabel">${esc(p.name)}<small>${p.busy ? "finishes current reply on " + esc(CONFIG.model) + ", then drops" : "cached — respawns on next message"}</small></span>` +
         `<span class="hval">${st}</span></div>`;
-    }).join("") : `<p style="margin:0;color:var(--color-faint);font-size:var(--text-sm)">No leads registered.</p>`;
+    }).join("") : `<p style="margin:0;color:var(--color-faint);font-size:var(--text-sm)">No agents registered.</p>`;
   }
   function markPending() {
     pending.style.borderColor = ""; pendingPico.textContent = "◷";
@@ -1045,9 +944,9 @@
       const bits = [];
       if (pendModel !== CONFIG.model) bits.push(`model → ${esc(pendModel)}`);
       if (pendThinking !== CONFIG.thinking) bits.push(`thinking → ${esc(pendThinking)}`);
-      pendingText.innerHTML = `<b>Saved · ${bits.join(" · ")}.</b> Applies on each lead's next message — cached leads respawn with the new setting; any in-flight reply finishes on the old one.`;
+      pendingText.innerHTML = `<b>Saved · ${bits.join(" · ")}.</b> Applies on each agent's next message — cached agents respawn with the new setting; any in-flight reply finishes on the old one.`;
     }
-    renderLeadEffect();
+    renderAgentEffect();
   }
   function showConfigError(msg) {
     pending.hidden = false;
@@ -1078,51 +977,7 @@
     try { await jpost("/config", { thinking: l }); }
     catch (err) { showConfigError(err.message || String(err)); }
   });
-  renderLeadEffect();
-
-  /* ============================================================
-     SUB-AGENTS
-     ============================================================ */
-  const SUBCFG = CONFIG.subagent || { enabled: false, model: "", thinking: "medium" };
-  document.getElementById("subToolChips").innerHTML = SUB_ALLOW.map(t =>
-    `<span class="chip accent"><span>${esc(t)}</span></span>`).join("");
-  document.getElementById("subDenyChips").innerHTML = SUB_DENY.map(t =>
-    `<span class="chip"><span style="color:var(--color-faint);text-decoration:line-through">${esc(t)}</span></span>`).join("");
-  document.getElementById("subPrompt").textContent = SUB_PROMPT;
-
-  // Sub-agent config writes → POST /config { subagent: {...} }
-  const subEnabled = document.getElementById("subEnabled");
-  const subModel = document.getElementById("subModel");
-  subEnabled.checked = !!SUBCFG.enabled;
-  subModel.innerHTML = (CONFIG.models || []).map(m =>
-    `<option value="${esc(m.id)}" ${m.id === SUBCFG.model ? "selected" : ""}>${esc(m.name || m.id)} (${esc(m.provider || CONFIG.provider)})</option>`).join("");
-  async function saveSub(patch) {
-    try { await jpost("/config", { subagent: patch }); }
-    catch (err) { alert("Sub-agent save failed: " + (err.message || err)); }
-  }
-  subEnabled.addEventListener("change", () => saveSub({ enabled: subEnabled.checked }));
-  subModel.addEventListener("change", () => saveSub({ model: subModel.value }));
-  buildSeg(document.getElementById("subThinkSeg"), CONFIG.thinkingLevels, SUBCFG.thinking, (l) => saveSub({ thinking: l }));
-
-  const navSubBadge = document.getElementById("navSubBadge");
-  const subRunsEl = document.getElementById("subRuns");
-  function renderSubRuns() {
-    navSubBadge.textContent = SUB_RUNS.length;
-    const runs = SUB_RUNS.slice().reverse();
-    subRunsEl.innerHTML = runs.length ? runs.map(r =>
-      `<div class="sub ${r.status}"><div class="sub-top">` +
-        `<span class="sub-dot"></span>` +
-        `<span class="sub-task">${esc(r.task || "(investigation)")}</span>` +
-        `<span class="sub-meta">` +
-          `<span class="chip"><b>model</b><span>${esc(r.model)}</span></span>` +
-          `<span class="st-badge ${r.status}">${r.status === "done" ? "ok" : r.status}</span>` +
-          `<span class="sub-t">${esc(fmtAgo(r.at))}</span>` +
-        `</span></div>` +
-        (r.result ? `<div class="sub-res"><span class="rk">result</span> &nbsp;${esc(r.result)}</div>` : "") +
-      `</div>`
-    ).join("") : `<p style="margin:0;color:var(--color-faint);font-size:var(--text-sm)">No sub-agent runs yet — leads delegate here when a dig is heavy.</p>`;
-  }
-  renderSubRuns();
+  renderAgentEffect();
 
   /* ============================================================
      TOOLS INSPECTOR
@@ -1157,7 +1012,6 @@
         `<span class="tsum-desc">${esc(t.description)}</span>` +
         `<span class="tsum-badges">` +
           `<span class="tag ${t.source === "custom" ? "custom" : ""}">${esc(t.source)}</span>` +
-          (t.sub ? `<span class="avail sub">sub-agent</span>` : `<span class="avail lead">lead</span>`) +
         `</span>` +
       `</summary><div class="tbody">` +
         `<p class="tdesc">${esc(t.description)}</p>` +
@@ -1173,7 +1027,6 @@
     const list = TOOLS.filter(t => {
       if (toolF === "builtin" && t.source !== "builtin") return false;
       if (toolF === "custom" && t.source !== "custom") return false;
-      if (toolF === "sub" && !t.sub) return false;
       if (!q) return true;
       const hay = (t.name + " " + t.description + " " + (t.guidelines || []).join(" ")).toLowerCase();
       return hay.includes(q);
@@ -1200,12 +1053,12 @@
      ============================================================ */
   const prefEnter = document.getElementById("prefEnter");
   const prefMotion = document.getElementById("prefMotion");
-  prefEnter.checked = localStorage.getItem("pi-lead.enterToSend") !== "0";
-  prefMotion.checked = localStorage.getItem("pi-lead.reduceMotion") === "1";
+  prefEnter.checked = localStorage.getItem("pi-agent.enterToSend") !== "0";
+  prefMotion.checked = localStorage.getItem("pi-agent.reduceMotion") === "1";
   document.documentElement.toggleAttribute("data-reduce-motion", prefMotion.checked);
-  prefEnter.addEventListener("change", () => localStorage.setItem("pi-lead.enterToSend", prefEnter.checked ? "1" : "0"));
+  prefEnter.addEventListener("change", () => localStorage.setItem("pi-agent.enterToSend", prefEnter.checked ? "1" : "0"));
   prefMotion.addEventListener("change", () => {
-    localStorage.setItem("pi-lead.reduceMotion", prefMotion.checked ? "1" : "0");
+    localStorage.setItem("pi-agent.reduceMotion", prefMotion.checked ? "1" : "0");
     document.documentElement.toggleAttribute("data-reduce-motion", prefMotion.checked);
   });
 
@@ -1221,12 +1074,9 @@
 
   function renderChips() {
     const steps = PROJECTS.reduce((a, p) => a + (p.steps || 0), 0);
-    const agents = PROJECTS.reduce((a, p) => a + (p.agents || 0), 0);
     const tokens = PROJECTS.reduce((a, p) => a + (p.tokens || 0), 0);
     liveChips.innerHTML =
       `<span class="chip accent"><b>steps</b><span>${steps}</span></span>` +
-      `<span class="chip accent"><b>agents</b><span>${agents}</span></span>` +
-      `<span class="chip"><b>runs</b><span>${SUB_RUNS.length}</span></span>` +
       `<span class="chip"><b>tok</b><span>${fmtTok(tokens)}</span></span>`;
   }
   renderChips();
@@ -1254,8 +1104,8 @@
   // Refresh the project registry (e.g. on hello / add), preserving live counters.
   function syncProjects(list) {
     if (!Array.isArray(list)) return;
-    PROJECTS = list.map(p => { const prev = stateFor(p.id); return prev ? { ...prev, ...p } : newLeadState(p); });
-    renderLeadViews(); renderLeadEffect();
+    PROJECTS = list.map(p => { const prev = stateFor(p.id); return prev ? { ...prev, ...p } : newAgentState(p); });
+    renderAgentViews(); renderAgentEffect();
   }
 
   // Transport via the shared @pi/protocol client. Typed per-type handlers keyed
@@ -1281,16 +1131,15 @@
   const onFrame = (type, fn) => client.on(type, (m) => {
     const st = m.project ? stateFor(m.project) : null;
     fn(m, st);
-    renderStatGrid(); renderOvLeads(); renderLeads(); renderLeadEffect(); renderChips();
+    renderStatGrid(); renderOvAgents(); renderAgents(); renderAgentEffect(); renderChips();
   });
 
   onFrame(OUT.TYPING, (m, st) => {
     if (st) { st.busy = true; st.lastAt = Date.now(); }
-    pushEvent(OUT.TYPING, m.project, "lead thinking");
+    pushEvent(OUT.TYPING, m.project, "agent thinking");
   });
   onFrame(OUT.STEP, (m, st) => {
-    const agent = isAgentTool(m.tool);
-    if (st) { if (agent) st.agents++; else st.steps++; st.lastAt = Date.now(); }
+    if (st) { st.steps++; st.lastAt = Date.now(); }
     pushEvent(OUT.STEP, m.project, `<code>${esc(m.tool || "?")}</code>`);
   });
   onFrame(OUT.TOOL_END, (m, st) => {
@@ -1304,23 +1153,11 @@
     if (st) { st.tokens += (m.input || 0) + (m.output || 0); st.lastAt = Date.now(); }
     pushEvent(OUT.USAGE, m.project, `in ${fmtTok(m.input || 0)} · out ${fmtTok(m.output || 0)}`);
   });
-  onFrame(OUT.SUBAGENT, (m) => {
-    if (m.phase === "start") {
-      SUB_RUNS.push({ id: m.id, project: m.project, task: m.task || "", status: "running", result: "", model: m.model || SUBCFG.model || CONFIG.model, at: Date.now() });
-      if (SUB_RUNS.length > 40) SUB_RUNS.shift();
-      pushEvent(OUT.SUBAGENT, m.project, `start · ${esc(m.task || "investigation")}`);
-    } else {
-      const r = SUB_RUNS.find(x => x.id === m.id);
-      if (r) { r.status = m.ok ? "done" : "error"; r.result = m.result || ""; if (m.model) r.model = m.model; }
-      pushEvent(OUT.SUBAGENT, m.project, `end · ${m.ok ? "ok" : "fail"}${m.result ? " · " + esc(String(m.result).slice(0, 80)) : ""}`);
-    }
-    renderSubRuns();
-  });
   onFrame(OUT.DELTA, (m, st) => {
     if (m.text) pushEvent(OUT.DELTA, m.project, esc(m.text));
     if (st) st.lastAt = Date.now();
   });
-  // Attached mid-turn: the lead already has a turn in flight. Mark it busy and
+  // Attached mid-turn: the agent already has a turn in flight. Mark it busy and
   // note the resumed partial + running tool in the activity feed (monitor view).
   onFrame(OUT.RESUME, (m, st) => {
     if (st) { st.busy = true; st.lastAt = Date.now(); }
@@ -1330,7 +1167,7 @@
   });
   onFrame(OUT.DONE, (m, st) => {
     if (st) { st.busy = false; st.lastAt = Date.now(); }
-    pushEvent(OUT.DONE, m.project, `done · ${st ? st.steps : 0} steps · ${st ? st.agents : 0} agents · ${fmtTok(st ? st.tokens : 0)} tok`);
+    pushEvent(OUT.DONE, m.project, `done · ${st ? st.steps : 0} steps · ${fmtTok(st ? st.tokens : 0)} tok`);
   });
   onFrame(OUT.ERROR, (m, st) => {
     if (st) { st.busy = false; st.lastAt = Date.now(); }

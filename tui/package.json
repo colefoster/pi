@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Terminal client for the pi harness — a peer to pi-web. Chat with the lead, switch repos, watch streaming output, tweak model/thinking, all from the terminal.",
+  "description": "Terminal client for the pi harness — a peer to pi-web. Chat with the agent, switch repos, watch streaming output, tweak model/thinking, all from the terminal.",
   "bin": {
     "pi-tui": "./cli.mjs"
   },

@@ -2,7 +2,7 @@
 //
 // One global WebSocket; events are broadcast to all clients so we filter every
 // event by its `project` field into a per-project session slice. The turn
-// lifecycle (typing → delta/step/usage/subagent → done|error) drives the chat.
+// lifecycle (typing → delta/step/usage → done|error) drives the chat.
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Box, Text, useInput, useApp, useStdout } from "ink";
@@ -16,15 +16,14 @@ const html = htm.bind(React.createElement);
 
 // A fresh per-project session slice.
 const emptySession = () => ({
-  messages: [], // { role: "you"|"lead"|"error", text, ts? }
+  messages: [], // { role: "you"|"agent"|"error", text, ts? }
   loaded: false, // history fetched?
   streaming: "", // in-flight assistant text
   busy: false,
-  unread: false, // lead replied while this repo was in the background
-  lastTool: "", // most recent tool the lead invoked (for the status line)
+  unread: false, // agent replied while this repo was in the background
+  lastTool: "", // most recent tool the agent invoked (for the status line)
   toolRuns: [], // { id, tool, ok } — ok: null running · true done · false errored
   steps: 0,
-  agents: 0,
   tokensIn: 0,
   tokensOut: 0,
 });
@@ -118,7 +117,7 @@ export function App({ harnessUrl }) {
         if (!id) return;
         switch (m.type) {
           case OUT.TYPING:
-            patchSession(id, () => ({ busy: true, streaming: "", steps: 0, agents: 0, tokensIn: 0, tokensOut: 0, lastTool: "", toolRuns: [] }));
+            patchSession(id, () => ({ busy: true, streaming: "", steps: 0, tokensIn: 0, tokensOut: 0, lastTool: "", toolRuns: [] }));
             break;
           case OUT.DELTA:
             patchSession(id, (s) => ({ streaming: s.streaming + (m.text || "") }));
@@ -146,9 +145,6 @@ export function App({ harnessUrl }) {
               toolRuns: s.toolRuns.map((t) => (t.id === m.toolCallId ? { ...t, ok: !!m.ok } : t)),
             }));
             break;
-          case OUT.SUBAGENT:
-            if (m.phase === "start") patchSession(id, (s) => ({ agents: s.agents + 1, lastTool: "subagent" }));
-            break;
           case OUT.USAGE:
             patchSession(id, (s) => ({ tokensIn: s.tokensIn + (m.input | 0), tokensOut: s.tokensOut + (m.output | 0) }));
             break;
@@ -160,7 +156,7 @@ export function App({ harnessUrl }) {
               // badge the reply as unread if it landed in a background repo (E1).
               unread: id !== activeIdRef.current ? true : s.unread,
               messages: s.streaming.trim()
-                ? [...s.messages, { role: "lead", text: s.streaming.trim(), ts: Date.now() }]
+                ? [...s.messages, { role: "agent", text: s.streaming.trim(), ts: Date.now() }]
                 : s.messages,
             }));
             break;
@@ -172,7 +168,7 @@ export function App({ harnessUrl }) {
               unread: id !== activeIdRef.current ? true : s.unread,
               messages: [
                 ...s.messages,
-                ...(s.streaming.trim() ? [{ role: "lead", text: s.streaming.trim(), ts: Date.now() }] : []),
+                ...(s.streaming.trim() ? [{ role: "agent", text: s.streaming.trim(), ts: Date.now() }] : []),
                 { role: "error", text: m.text || "error", ts: Date.now() },
               ],
             }));
@@ -200,7 +196,7 @@ export function App({ harnessUrl }) {
       .then((history) => {
         if (!alive) return;
         const mapped = (history || []).map((m) => ({
-          role: m.role === "user" ? "you" : "lead",
+          role: m.role === "user" ? "you" : "agent",
           text: m.text,
           ts: m.ts ?? null,
         }));
@@ -230,7 +226,7 @@ export function App({ harnessUrl }) {
     if (!text || !activeId) return;
     const s = sessions[activeId] || emptySession();
     if (s.busy) {
-      flash("lead is still working on the last one…");
+      flash("agent is still working on the last one…");
       return;
     }
     // Don't fire into a dead socket — it'd queue silently and spin forever (B5).
@@ -258,7 +254,7 @@ export function App({ harnessUrl }) {
   const chatView = (() => {
     const innerW = Math.max(1, logW - 4); // border(2) + paddingX(2)
     const bubbles = [...sess.messages];
-    if (sess.streaming) bubbles.push({ role: "lead", text: sess.streaming, live: true });
+    if (sess.streaming) bubbles.push({ role: "agent", text: sess.streaming, live: true });
     const costs = bubbles.map((b) => estLines(b.text, innerW));
     const totalRows = costs.reduce((a, b) => a + b, 0);
     const viewRows = Math.max(1, bodyHeight - 2); // inside the log's border
@@ -455,7 +451,7 @@ function Sidebar({ projects, activeId, sessions, width, height }) {
 function ChatLog({ view, width, height, project }) {
   const { shown, hiddenAbove, hiddenBelow } = view;
   const color = (r) => (r === "you" ? "green" : r === "error" ? "red" : "white");
-  const label = (r) => (r === "you" ? "you" : r === "error" ? "!!" : "lead");
+  const label = (r) => (r === "you" ? "you" : r === "error" ? "!!" : "agent");
 
   return html`
     <${Box} flexDirection="column" width=${width} height=${height} borderStyle="round" borderColor="gray" paddingX=${1} overflow="hidden">
@@ -493,8 +489,8 @@ function StatusLine({ session, config, notice, scrolled }) {
         ${session.busy
           ? html`<${Text} color="yellow"><${Spinner} type="dots" /> working<//>`
           : html`<${Text} color="gray">idle<//>`}
-        ${session.busy || session.steps || session.agents
-          ? html`<${Text} color="gray">  ·  ${session.steps} tools${session.agents ? ` · ${session.agents} agents` : ""}${
+        ${session.busy || session.steps
+          ? html`<${Text} color="gray">  ·  ${session.steps} tools${
               session.tokensOut ? ` · ${session.tokensIn + session.tokensOut} tok` : ""
             }<//>`
           : null}
@@ -520,7 +516,7 @@ function InputBar({ value, onChange, onSubmit, busy }) {
         value=${value}
         onChange=${onChange}
         onSubmit=${onSubmit}
-        placeholder=${busy ? "lead is working — send is blocked until it replies" : "message the lead   (Tab switch · ↑/PgUp scroll · Ctrl+N add · Ctrl+O model · Ctrl+G inspect · Ctrl+C quit)"}
+        placeholder=${busy ? "agent is working — send is blocked until it replies" : "message the agent   (Tab switch · ↑/PgUp scroll · Ctrl+N add · Ctrl+O model · Ctrl+G inspect · Ctrl+C quit)"}
       />
     <//>
   `;
@@ -609,7 +605,6 @@ function InspectorModal({ manifest, onClose }) {
     <${Overlay} title=${`Inspector — ${manifest.project?.name || ""}`}>
       <${Text}><${Text} color="gray">model    <//>${manifest.provider}/${manifest.model} · ${manifest.thinking}<//>
       <${Text}><${Text} color="gray">tools    <//>${(manifest.toolNames || []).join(", ")}<//>
-      <${Text}><${Text} color="gray">subagent <//>${manifest.subagent?.enabled ? `${manifest.subagent.model} · ${manifest.subagent.thinking}` : "off"}<//>
       <${Box} marginTop=${1} flexDirection="column">
         <${Text} color="gray">system prompt<//>
         <${Text} wrap="wrap">${(manifest.systemPrompt || "").slice(0, 600)}${(manifest.systemPrompt || "").length > 600 ? "…" : ""}<//>

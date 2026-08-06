@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>leads · pi</title>
+<title>agent · pi</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" />
@@ -153,7 +153,7 @@
     background: var(--color-me); color: var(--color-txt);
     border-bottom-right-radius: var(--radius-sm);
   }
-  .msg.lead {
+  .msg.agent {
     align-self: flex-start;
     background: var(--color-raised); color: var(--color-txt);
     border: 1px solid var(--color-line-soft);
@@ -218,7 +218,7 @@
   button.send:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
   button.send:disabled { opacity: 0.4; cursor: default; background: var(--color-accent-dim); }
 
-  /* stop/cancel — only shown while the active lead's turn is in flight */
+  /* stop/cancel — only shown while the active agent's turn is in flight */
   button.stop {
     background: transparent; color: var(--color-danger);
     border: 1px solid color-mix(in oklch, var(--color-danger) 40%, var(--color-line));
@@ -575,7 +575,7 @@
   .prm > code { font-family: var(--font-mono); color: var(--color-txt); }
   .prm-t { font-family: var(--font-mono); color: var(--color-accent-dim); font-size: 10px; }
   .prm-d { color: var(--color-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .prm-none, .tl-none, .sub-none { color: var(--color-faint); font-size: var(--text-xs); font-style: italic; }
+  .prm-none, .tl-none { color: var(--color-faint); font-size: var(--text-xs); font-style: italic; }
 
   pre.sysprompt {
     margin: 0; max-height: 168px; overflow: auto;
@@ -595,32 +595,6 @@
   }
   .tl .tl-t { color: var(--color-faint); font-variant-numeric: tabular-nums; text-align: right; }
   .tl code { color: var(--color-txt); }
-  .tl.agent code { color: var(--color-accent); }
-  .tl.agent::after { content: "subagent"; color: var(--color-accent-dim); font-size: 10px; }
-
-  .sub {
-    background: var(--color-bg); border: 1px solid var(--color-line-soft);
-    border-left: 2px solid var(--color-accent-dim);
-    border-radius: var(--radius-md); padding: var(--space-sm) var(--space-md);
-  }
-  .sub + .sub { margin-top: var(--space-2xs); }
-  .sub-top { display: flex; align-items: center; gap: var(--space-sm); }
-  .sub-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--color-line); }
-  .sub.running .sub-dot { background: var(--color-accent); box-shadow: 0 0 8px var(--color-accent-glow);
-    animation: pulse 1.4s var(--ease-in-out) infinite; }
-  :root[data-reduce-motion] .sub.running .sub-dot { animation: none; }
-  .sub.error { border-left-color: var(--color-danger); }
-  .sub.error .sub-dot { background: var(--color-danger); }
-  .sub-task { flex: 1; font-size: var(--text-xs); color: var(--color-txt); line-height: 1.45;
-    overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .sub-t { flex-shrink: 0; font-family: var(--font-mono); font-size: 10px; color: var(--color-faint);
-    font-variant-numeric: tabular-nums; }
-  .sub-res {
-    margin-top: var(--space-xs); max-height: 108px; overflow-y: auto;
-    font-size: 11px; line-height: 1.5; color: var(--color-dim); white-space: pre-wrap; word-break: break-word;
-    padding-top: var(--space-xs); border-top: 1px solid var(--color-line-soft);
-    scrollbar-width: thin; scrollbar-color: var(--color-line) transparent;
-  }
 
   @media (max-width: 640px) {
     .inspector { width: 100vw; }
@@ -636,7 +610,7 @@
 </head>
 <body>
   <aside>
-    <div class="brand">leads</div>
+    <div class="brand">agent</div>
     <div id="projlist"></div>
     <div class="aside-foot">
       <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings">⚙</button>
@@ -654,7 +628,7 @@
     <div id="logs"></div>
     <footer>
       <form id="f">
-        <textarea id="in" rows="1" placeholder="Message the lead…" autofocus></textarea>
+        <textarea id="in" rows="1" placeholder="Message the agent…" autofocus></textarea>
         <button class="stop" id="stop" type="button" hidden>Stop</button>
         <button class="send" id="send" type="submit">Send</button>
       </form>
@@ -751,10 +725,6 @@
         <div class="toollog" id="inspToolLog"></div>
       </section>
       <section class="insp-sec">
-        <h3>Subagents <span class="n" id="inspSubCount"></span></h3>
-        <div id="inspSubs"></div>
-      </section>
-      <section class="insp-sec">
         <h3>System prompt</h3>
         <pre class="sysprompt" id="inspPrompt"></pre>
       </section>
@@ -780,7 +750,6 @@
   let active = null;                 // active project id
   const P = new Map();               // id -> per-project state
 
-  const isAgentTool = (n) => /subagent|agent|spawn|delegate|^task$/i.test(n || "");
   const fmtTok = (n) => (n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n));
   const fmtElapsed = (ms) => {
     const s = Math.round(ms / 1000);
@@ -792,8 +761,8 @@
     const logEl = document.createElement("div");
     logEl.className = "log";
     logsWrap.appendChild(logEl);
-    const st = { id, logEl, leadBubble: null, statusEl: null, statusTimer: null,
-                 steps: 0, agents: 0, tokens: 0, startedAt: 0, busy: false, toolLog: [], subs: [] };
+    const st = { id, logEl, agentBubble: null, statusEl: null, statusTimer: null,
+                 steps: 0, tokens: 0, startedAt: 0, busy: false, toolLog: [] };
     P.set(id, st);
     return st;
   }
@@ -806,7 +775,7 @@
     return d;
   }
 
-  // Composer reflects the active lead's turn state: Send disabled + Stop shown
+  // Composer reflects the active agent's turn state: Send disabled + Stop shown
   // while its turn is in flight (between `typing` and `done`/`error`).
   function syncComposer() {
     const st = active ? P.get(active) : null;
@@ -821,14 +790,13 @@
     if (!st.statusEl) return;
     const parts = [];
     if (st.steps > 0) parts.push(`${st.steps} step${st.steps === 1 ? "" : "s"}`);
-    if (st.agents > 0) parts.push(`${st.agents} agent${st.agents === 1 ? "" : "s"}`);
     parts.push(fmtElapsed(Date.now() - st.startedAt));
     if (st.tokens > 0) parts.push(`${fmtTok(st.tokens)} tok`);
     st.statusEl.querySelector(".label").textContent = parts.length === 1 ? `waiting · ${parts[0]}` : parts.join(" · ");
     syncInspector(st);
   }
   function startStatus(st) {
-    st.steps = 0; st.agents = 0; st.tokens = 0; st.startedAt = Date.now();
+    st.steps = 0; st.tokens = 0; st.startedAt = Date.now();
     st.statusEl = document.createElement("div");
     st.statusEl.className = "status";
     st.statusEl.innerHTML = '<span class="pulse"></span><span class="label"></span>';
@@ -880,8 +848,8 @@
 
   // ---- preferences (localStorage) ----
   const prefs = {
-    enterToSend: localStorage.getItem("pi-lead.enterToSend") !== "0",
-    reduceMotion: localStorage.getItem("pi-lead.reduceMotion") === "1",
+    enterToSend: localStorage.getItem("pi-agent.enterToSend") !== "0",
+    reduceMotion: localStorage.getItem("pi-agent.reduceMotion") === "1",
   };
   function applyPrefs() {
     document.documentElement.toggleAttribute("data-reduce-motion", prefs.reduceMotion);
@@ -949,7 +917,7 @@
     cfgNote.className = "set-note" + (kind ? " " + kind : "");
   };
 
-  // Push a harness-config change to the server; leads respawn with it.
+  // Push a harness-config change to the server; the agent respawns with it.
   async function saveConfig(patch) {
     cfgModel.disabled = cfgThinking.disabled = true;
     setNote("Saving…", "ok");
@@ -977,11 +945,11 @@
 
   prefEnter.addEventListener("change", () => {
     prefs.enterToSend = prefEnter.checked;
-    localStorage.setItem("pi-lead.enterToSend", prefEnter.checked ? "1" : "0");
+    localStorage.setItem("pi-agent.enterToSend", prefEnter.checked ? "1" : "0");
   });
   prefMotion.addEventListener("change", () => {
     prefs.reduceMotion = prefMotion.checked;
-    localStorage.setItem("pi-lead.reduceMotion", prefMotion.checked ? "1" : "0");
+    localStorage.setItem("pi-agent.reduceMotion", prefMotion.checked ? "1" : "0");
     applyPrefs();
   });
 
@@ -1045,8 +1013,6 @@
   const inspToolLog = document.getElementById("inspToolLog");
   const inspLiveName = document.getElementById("inspLiveName");
   const inspLive = document.getElementById("inspLive");
-  const inspSubs = document.getElementById("inspSubs");
-  const inspSubCount = document.getElementById("inspSubCount");
   let inspectorOpen = false;
 
   const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
@@ -1088,7 +1054,7 @@
     return String(d.getMinutes()).padStart(2, "0") + ":" + String(d.getSeconds()).padStart(2, "0");
   }
   function renderLive(st) {
-    if (!st) { inspStats.innerHTML = ""; inspToolLog.innerHTML = ""; inspSubs.innerHTML = ""; return; }
+    if (!st) { inspStats.innerHTML = ""; inspToolLog.innerHTML = ""; return; }
     inspLive.classList.toggle("on", !!st.busy);
     const stats = [chip("status", st.busy ? "working" : "idle"), chip("steps", st.steps)];
     if (st.tokens > 0) stats.push(chip("tokens", fmtTok(st.tokens)));
@@ -1102,20 +1068,9 @@
         ? ' <span style="color:var(--color-accent)">✓</span>'
         : ' <span style="color:var(--color-danger)">✗</span>';
     inspToolLog.innerHTML = log.length
-      ? log.map((e) => `<div class="tl ${e.agent ? "agent" : ""}"><span class="tl-t">${fmtAt(st, e.at)}</span><code>${esc(e.tool)}${mark(e)}</code></div>`).join("")
+      ? log.map((e) => `<div class="tl"><span class="tl-t">${fmtAt(st, e.at)}</span><code>${esc(e.tool)}${mark(e)}</code></div>`).join("")
       : '<span class="tl-none">no tool calls yet</span>';
     inspToolLog.scrollTop = inspToolLog.scrollHeight;
-
-    inspSubCount.textContent = st.subs.length ? `· ${st.subs.length}` : "";
-    inspSubs.innerHTML = st.subs.length
-      ? st.subs.slice().reverse().map((s) =>
-          `<div class="sub ${esc(s.status)}"><div class="sub-top">` +
-            `<span class="sub-dot"></span><span class="sub-task">${esc(s.task)}</span>` +
-            `<span class="sub-t">${fmtAt(st, s.at)}</span></div>` +
-            (s.result ? `<div class="sub-res">${esc(s.result)}</div>` : "") +
-          `</div>`
-        ).join("")
-      : '<span class="sub-none">none yet — the lead delegates here when a dig is heavy</span>';
   }
   // Live re-render, throttled by event cadence; called from renderStatus + ws events.
   function syncInspector(st) {
@@ -1185,10 +1140,9 @@
     renderSidebar();
   });
   onFrame(OUT.STEP, (m, st) => {
-    const agent = isAgentTool(m.tool);
-    if (agent) st.agents++; else st.steps++;
+    st.steps++;
     // track the running tool by id so tool_end can pair + mark it
-    st.toolLog.push({ tool: m.tool || "?", at: Date.now(), agent, id: m.toolCallId, ok: null });
+    st.toolLog.push({ tool: m.tool || "?", at: Date.now(), id: m.toolCallId, ok: null });
     if (st.toolLog.length > 200) st.toolLog.shift();
     renderStatus(st);
   });
@@ -1203,18 +1157,9 @@
     st.tokens += (m.input || 0) + (m.output || 0);
     renderStatus(st);
   });
-  onFrame(OUT.SUBAGENT, (m, st) => {
-    if (m.phase === "start") {
-      st.subs.push({ id: m.id, task: m.task || "", status: "running", result: "", at: Date.now() });
-      if (st.subs.length > 12) st.subs.shift();
-    } else {
-      const s = st.subs.find((x) => x.id === m.id);
-      if (s) { s.status = m.ok ? "done" : "error"; s.result = m.result || ""; }
-    }
-  });
   onFrame(OUT.DELTA, (m, st) => {
-    if (!st.leadBubble) st.leadBubble = bubble(st, "msg lead", "");
-    st.leadBubble.textContent += m.text;
+    if (!st.agentBubble) st.agentBubble = bubble(st, "msg agent", "");
+    st.agentBubble.textContent += m.text;
     st.logEl.scrollTop = st.logEl.scrollHeight;
   });
   // Attached mid-turn: seed the in-progress turn as if the deltas/step so far had
@@ -1223,26 +1168,25 @@
   onFrame(OUT.RESUME, (m, st) => {
     st.busy = true;
     if (!st.statusEl) startStatus(st);
-    if (!st.leadBubble) st.leadBubble = bubble(st, "msg lead", "");
-    st.leadBubble.textContent = m.text || "";
+    if (!st.agentBubble) st.agentBubble = bubble(st, "msg agent", "");
+    st.agentBubble.textContent = m.text || "";
     st.logEl.scrollTop = st.logEl.scrollHeight;
     if (m.tool) {
-      const agent = isAgentTool(m.tool);
-      if (agent) st.agents++; else st.steps++;
-      st.toolLog.push({ tool: m.tool, at: Date.now(), agent, id: null, ok: null });
+      st.steps++;
+      st.toolLog.push({ tool: m.tool, at: Date.now(), id: null, ok: null });
       renderStatus(st);
     }
     if (m.project === active) syncComposer();
     renderSidebar();
   });
   onFrame(OUT.DONE, (m, st) => {
-    finishStatus(st); st.leadBubble = null; st.busy = false;
+    finishStatus(st); st.agentBubble = null; st.busy = false;
     if (m.project === active) syncComposer();
     renderSidebar();
   });
   onFrame(OUT.ERROR, (m, st) => {
-    finishStatus(st); st.leadBubble = null; st.busy = false;
-    bubble(st, "msg lead", "⚠️ " + m.text);
+    finishStatus(st); st.agentBubble = null; st.busy = false;
+    bubble(st, "msg agent", "⚠️ " + m.text);
     if (m.project === active) syncComposer();
     renderSidebar();
   });
@@ -1253,7 +1197,7 @@
     const st = stateFor(active);
     if (st.busy) return;
     bubble(st, "msg me", text);
-    st.leadBubble = null;
+    st.agentBubble = null;
     client.sendUser(active, text);
     input.value = ""; input.style.height = "auto";
     sendBtn.disabled = true;
