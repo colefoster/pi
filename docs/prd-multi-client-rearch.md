@@ -61,7 +61,7 @@ From my perspective as the user:
 ## Implementation Decisions
 
 ### Repository / workspace
-- **Consolidate into one pnpm workspace** rooted at `/Users/cole/Dev/pi`. Add real `packages:` globs to `pnpm-workspace.yaml` (currently it has none — it only pins build/release settings, so it is not actually a multi-package workspace today).
+- **Consolidate into one pnpm workspace** rooted at `the repo root`. Add real `packages:` globs to `pnpm-workspace.yaml` (currently it has none — it only pins build/release settings, so it is not actually a multi-package workspace today).
 - Promote the harness from a bare subdir of the `pi-lead` package into its own workspace package (e.g. `@pi/harness`). Fold `pi-web` → `@pi/web` and `pi-tui` → `@pi/tui` as workspace members. Replace their separate lockfiles (`pi-web` uses npm, `pi-tui` uses its own pnpm lock) with the single workspace lockfile.
 - **Language stays plain `.mjs` (ESM), no TypeScript build step.** The codebase is 100% `.mjs` with no `tsconfig` and no build pipeline; introducing TS is explicitly out of scope. Types come from **zod schemas (runtime) + JSDoc annotations (editor hints)**, which give validation and autocomplete without a compile step.
 
@@ -141,5 +141,5 @@ Known bugs from a prior review that this re-arch folds in (cited as motivation, 
 
 Additional context:
 - Current SDK: `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` both at **0.81.1**; Node **≥ 22.19**.
-- The three dirs are **not git repos**. Recommend `git init` (single monorepo repo at `/Users/cole/Dev/pi` after consolidation) before starting, so the re-arch has history.
+- The three dirs are **not git repos**. Recommend `git init` (single monorepo repo at `the repo root` after consolidation) before starting, so the re-arch has history.
 - Suggested phasing: (1) workspace consolidation + `git init`; (2) `@pi/protocol` + swap both frontends onto the SDK (kills duplication, adds versioning); (3) reconstructable harness state + lifecycle/bug fixes; (4) multi-client attach semantics (backscroll + resume frame, backpressure); (5) auth token; (6) [follow-up] per-project sandbox.

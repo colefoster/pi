@@ -30,7 +30,7 @@ const PROJECTS_FILE = join(ROOT, "projects.json");
 const SETTINGS_FILE = join(ROOT, "settings.json");
 const PROMPT_FILE = join(ROOT, "system-prompt.md"); // default prompt for every repo
 const PROJECT_PROMPT = ".pi-prompt.md"; // per-repo override, read from the project dir
-const DEFAULT_DIR = process.env.PROJECT_DIR || "/Users/cole/Dev/vgc-engine";
+const DEFAULT_DIR = process.env.PROJECT_DIR || process.cwd();
 // The full tool menu an agent can be given. settings.tools picks from this set;
 // the config UI offers exactly these as choices.
 const ALL_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];

@@ -7,3 +7,8 @@ settings.json
 .DS_Store
 # playwright/mcp litter
 .playwright-mcp/
+
+# Local secrets
+.env
+.env.*
+!.env.example

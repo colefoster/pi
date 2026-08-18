@@ -29,7 +29,7 @@ in two files.
 `pi` to `pnpm install`, and `pnpm exec pi` trips pnpm's dep-check — so call the binary directly:
 
 ```bash
-cd /Users/cole/Dev/pi
+cd path/to/pi
 ./node_modules/.bin/pi          # launches pi's TUI
 # then inside pi:  type  /login  → pick "ChatGPT Plus/Pro (Codex)"  → follow the code flow
 # quit pi once it says you're logged in
@@ -66,7 +66,7 @@ two transitive ignored-build deps, so **don't use `pnpm dev`** — run node dire
 **Harness** (required):
 
 ```bash
-cd /Users/cole/Dev/pi
+cd path/to/pi
 node harness/service.mjs        # harness API + event WS on :5179
 ```
 
@@ -119,7 +119,7 @@ anything in the UI or the file.
 
 | var | default | meaning |
 |-----|---------|---------|
-| `PROJECT_DIR` | `/Users/cole/Dev/vgc-engine` | **seed** repo written to a fresh `projects.json` |
+| `PROJECT_DIR` | _cwd_ | **seed** repo written to a fresh `projects.json` |
 | `PI_MODEL` | `gpt-5.6-sol` | Codex model id (see startup log) — seeds `settings.json` |
 | `PI_PROVIDER` | `openai-codex` | subscription provider — seeds `settings.json` |
 | `PI_THINKING` | `medium` | reasoning level — seeds `settings.json` |

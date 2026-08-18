@@ -546,7 +546,7 @@ function AddRepoModal({ client, onDone, onCancel }) {
       <${Text} color="gray">Absolute path or ~ (Enter to add, Esc to cancel)<//>
       <${Box} marginTop=${1}>
         <${Text} color="cyan">dir › <//>
-        ${busy ? html`<${Text} color="yellow">adding…<//>` : html`<${TextInput} value=${dir} onChange=${setDir} onSubmit=${submit} placeholder="/Users/cole/Dev/…" />`}
+        ${busy ? html`<${Text} color="yellow">adding…<//>` : html`<${TextInput} value=${dir} onChange=${setDir} onSubmit=${submit} placeholder="/path/to/repo" />`}
       <//>
       ${err ? html`<${Text} color="red">${err}<//>` : null}
     <//>

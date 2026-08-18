@@ -8,7 +8,7 @@ Tracer-bullet phases. Phase 1 is a thin end-to-end proof through every layer (ha
 
 Durable decisions that apply across all phases:
 
-- **Monorepo**: single pnpm workspace rooted at `/Users/cole/Dev/pi`, under one git repo. Members: `@pi/harness` (promoted from the current `harness/` subdir), `@pi/web` (was `pi-web`), `@pi/tui` (was `pi-tui`), `@pi/protocol` (new). Single lockfile.
+- **Monorepo**: single pnpm workspace rooted at `the repo root`, under one git repo. Members: `@pi/harness` (promoted from the current `harness/` subdir), `@pi/web` (was `pi-web`), `@pi/tui` (was `pi-tui`), `@pi/protocol` (new). Single lockfile.
 - **Protocol package** `@pi/protocol` is the single source of truth for the wire contract: event/message zod schemas, a `PROTOCOL_VERSION` constant, and a thin typed client SDK (connect+token, auto-reconnect, typed `on()`/senders). No hand-rolled `ws`/`fetch` glue or hardcoded event strings in any frontend.
 - **Transport**: HTTP control API + WS event stream on `:5179` (unchanged port). Daemon stays.
   - **HTTP routes**: `GET /health`, `GET|POST /config`, `GET /manifest?project=`, `GET /messages?project=`, `GET|POST /projects`. Mutating routes (`POST`) are token-gated.
@@ -29,7 +29,7 @@ Durable decisions that apply across all phases:
 
 Bring the three sibling directories under one git repo and one pnpm workspace without changing behavior, then apply the two trivial crash-fixes so the system is stable to develop against for every later phase.
 
-- `git init` a single repo at `/Users/cole/Dev/pi`; bring `pi-web` and `pi-tui` in as workspace members (drop their separate npm/pnpm lockfiles for the single workspace lockfile).
+- `git init` a single repo at `the repo root`; bring `pi-web` and `pi-tui` in as workspace members (drop their separate npm/pnpm lockfiles for the single workspace lockfile).
 - Add real `packages:` globs to `pnpm-workspace.yaml`; promote `harness/` into a `@pi/harness` package. Give web/tui their `@pi/*` package names.
 - Add `ws.on("error", …)` to every client socket, and wrap each `ws.send` in the fan-out loop in try/catch.
 
